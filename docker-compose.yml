@@ -48,7 +48,7 @@ volumes:
   zeno_vault:
     driver: local
 
-network:
+networks:
   zeno.net:
     name: zeno.net
     driver: bridge
