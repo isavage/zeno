@@ -20,7 +20,7 @@ from app.security.encryption import vault_cipher
 from app.agent.core import zeno_agent
 from app.agent.memory import memory_store
 from app.voice.stt import stt_engine
-from app.voice.tts import tts_engine
+from app.voice import tts_engine
 from app.channels.telegram_bot import telegram_manager
 
 from app.agent import prefs
@@ -139,7 +139,14 @@ app.include_router(admin_router)
 # Settings page – simple UI to edit defaults (template to be created at templates/settings.html)
 @app.get("/settings", response_class=HTMLResponse)
 async def settings_page(request: Request):
-    return templates.TemplateResponse("settings.html", {"request": request, "admin_token": settings.ADMIN_TOKEN})
+    return templates.TemplateResponse(
+        "settings.html",
+        {
+            "request": request,
+            "admin_token": settings.ADMIN_TOKEN,
+            "authorized_emails": settings.authorized_emails_list,
+        },
+    )
 
 # ----------------- Web UI & Authentication -----------------
 

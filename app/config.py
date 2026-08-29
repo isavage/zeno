@@ -33,7 +33,7 @@ class Settings(BaseSettings):
     DEFAULT_FAST_MODEL: str = "nousresearch/hermes-3-llama-3.1-8b"
     DEFAULT_REASONING_MODEL: str = "gpt-5.4-mini"
     DEFAULT_FALLBACK_MODEL: str = "meta-llama/llama-3.3-70b-instruct:free"
-    ALLOWED_HOSTS: str = "zeno.varunrs.in,chat.varunrs.in,localhost,127.0.0.1"  # comma‑separated list of hostnames allowed by TrustedHostMiddleware
+    ALLOWED_HOSTS: str = "localhost,127.0.0.1"  # comma‑separated list of hostnames allowed by TrustedHostMiddleware
     ADMIN_EMAILS: str = ""  # comma‑separated list of admin user emails
 
     @property
@@ -44,12 +44,7 @@ class Settings(BaseSettings):
         return [h.strip().lower() for h in self.ALLOWED_HOSTS.split(",") if h.strip()]
 
 
-    @property
-    def allowed_hosts(self) -> List[str]:
-        """Return a list of hostnames (lower‑cased) for TrustedHostMiddleware."""
-        if not self.ALLOWED_HOSTS:
-            return []
-        return [h.strip().lower() for h in self.ALLOWED_HOSTS.split(",") if h.strip()]
+
 
     @property
     def admin_emails(self) -> List[str]:
@@ -80,6 +75,10 @@ class Settings(BaseSettings):
     # Voice Engine
     WHISPER_MODEL_SIZE: str = "base.en"
     KOKORO_VOICE: str = "af_heart"
+    # Primary TTS provider: "edge" uses free edge‑tts wrapper, "kokoro" forces Kokoro only
+    TTS_PROVIDER: str = "edge"
+    # Edge TTS voice selection (default female)
+    EDGE_TTS_VOICE: str = "en-US-AriaNeural"
 
     @property
     def allowed_telegram_ids(self) -> List[int]:

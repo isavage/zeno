@@ -17,7 +17,7 @@ from app.config import settings
 from app.agent.core import zeno_agent
 from app.agent.memory import memory_store
 from app.voice.stt import stt_engine
-from app.voice.tts import tts_engine
+from app.voice import tts_engine
 
 logger = logging.getLogger(__name__)
 
