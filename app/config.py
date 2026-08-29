@@ -101,8 +101,6 @@ class Settings(BaseSettings):
         return [e.strip().lower() for e in self.AUTHORIZED_EMAILS.split(",") if e.strip()]
 
     @property
-
-    @property
     def vault_path(self) -> Path:
         p = Path(self.VAULT_DATA_DIR)
         p.mkdir(parents=True, exist_ok=True)
