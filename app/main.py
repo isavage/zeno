@@ -102,6 +102,17 @@ def verify_admin(token: str = Header(..., description="Admin token")):
     if token != settings.ADMIN_TOKEN:
         raise HTTPException(status_code=401, detail="Invalid admin token")
 
+
+def build_redirect_uri(request: Request, path: str) -> str:
+    """Build an absolute redirect URI using the current request origin."""
+    forwarded_host = request.headers.get("x-forwarded-host")
+    forwarded_proto = request.headers.get("x-forwarded-proto")
+
+    host = (forwarded_host or request.headers.get("host") or request.url.netloc).split(",")[0].strip()
+    scheme = (forwarded_proto or request.url.scheme).split(",")[0].strip()
+    normalized_path = path if path.startswith("/") else f"/{path}"
+    return f"{scheme}://{host}{normalized_path}"
+
 @admin_router.get("/models")
 def list_models():
     """Return a dict of provider -> list of model identifiers.
@@ -201,11 +212,12 @@ async def oauth_login(provider: str, request: Request):
     if not client:
         return RedirectResponse(url="/login?error=OAuth+provider+not+configured")
 
-    # Use the current request host so the session cookie and OAuth callback
-    # stay on the same origin. Hardcoding localhost here can trigger
-    # Authlib's mismatching_state error when the app is accessed through a
-    # different host, IP, or reverse proxy.
-    redirect_uri = str(request.url_for("oauth_callback", provider=provider))
+    redirect_path = (
+        settings.GOOGLE_REDIRECT_PATH
+        if provider == "google"
+        else settings.MICROSOFT_REDIRECT_PATH
+    )
+    redirect_uri = build_redirect_uri(request, redirect_path)
     return await client.authorize_redirect(request, redirect_uri)
 
 @app.get("/auth/{provider}/callback")

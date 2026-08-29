@@ -67,13 +67,13 @@ class Settings(BaseSettings):
     # Google OAuth
     GOOGLE_CLIENT_ID: Optional[str] = None
     GOOGLE_CLIENT_SECRET: Optional[str] = None
-    GOOGLE_REDIRECT_URI: str = "http://localhost:8000/auth/google/callback"
+    GOOGLE_REDIRECT_PATH: str = "/auth/google/callback"
 
     # Microsoft OAuth
     MICROSOFT_CLIENT_ID: Optional[str] = None
     MICROSOFT_CLIENT_SECRET: Optional[str] = None
     MICROSOFT_TENANT_ID: str = "common"
-    MICROSOFT_REDIRECT_URI: str = "http://localhost:8000/auth/microsoft/callback"
+    MICROSOFT_REDIRECT_PATH: str = "/auth/microsoft/callback"
 
     # Voice Engine
     WHISPER_MODEL_SIZE: str = "base.en"
@@ -99,6 +99,8 @@ class Settings(BaseSettings):
         if not self.AUTHORIZED_EMAILS:
             return []
         return [e.strip().lower() for e in self.AUTHORIZED_EMAILS.split(",") if e.strip()]
+
+    @property
 
     @property
     def vault_path(self) -> Path:
