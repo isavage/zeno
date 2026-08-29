@@ -1,0 +1,54 @@
+services:
+  zeno:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: zeno
+    restart: unless-stopped
+    ports:
+      - "${PORT:-8000}"
+    environment:
+      # Doppler passes all secrets directly into environment variables at runtime
+      - PORT=${PORT:-8000}
+      - HOST=${HOST:-0.0.0.0}
+      - APP_SECRET_KEY=${APP_SECRET_KEY}
+      - ZENOS_ENCRYPTION_KEY=${ZENOS_ENCRYPTION_KEY}
+      - VAULT_DATA_DIR=/data/vault
+      - OPENAI_API_KEY=${OPENAI_API_KEY}
+      - DEEPSEEK_API_KEY=${DEEPSEEK_API_KEY}
+      - MOONSHOT_API_KEY=${MOONSHOT_API_KEY}
+      - OPENROUTER_API_KEY=${OPENROUTER_API_KEY}
+      - DEFAULT_FAST_MODEL=${DEFAULT_FAST_MODEL:-nousresearch/hermes-3-llama-3.1-8b}
+      - DEFAULT_REASONING_MODEL=${DEFAULT_REASONING_MODEL:-deepseek-chat}
+      - DEFAULT_FALLBACK_MODEL=${DEFAULT_FALLBACK_MODEL:-meta-llama/llama-3.3-70b-instruct:free}
+      - TELEGRAM_BOT_TOKEN=${TELEGRAM_BOT_TOKEN}
+      - TELEGRAM_ALLOWED_USER_IDS=${TELEGRAM_ALLOWED_USER_IDS}
+      - ENABLE_TELEGRAM_VOICE_REPLIES=${ENABLE_TELEGRAM_VOICE_REPLIES:-true}
+      - AUTH_PROVIDER=${AUTH_PROVIDER:-google}
+      - AUTHORIZED_EMAILS=${AUTHORIZED_EMAILS}
+      - GOOGLE_CLIENT_ID=${GOOGLE_CLIENT_ID}
+      - GOOGLE_CLIENT_SECRET=${GOOGLE_CLIENT_SECRET}
+      - GOOGLE_REDIRECT_URI=${GOOGLE_REDIRECT_URI}
+      - MICROSOFT_CLIENT_ID=${MICROSOFT_CLIENT_ID}
+      - MICROSOFT_CLIENT_SECRET=${MICROSOFT_CLIENT_SECRET}
+      - MICROSOFT_TENANT_ID=${MICROSOFT_TENANT_ID:-common}
+      - MICROSOFT_REDIRECT_URI=${MICROSOFT_REDIRECT_URI}
+      - WHISPER_MODEL_SIZE=${WHISPER_MODEL_SIZE:-base.en}
+      - KOKORO_VOICE=${KOKORO_VOICE:-af_heart}
+    volumes:
+      - zeno_vault:/data/vault
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 20s
+
+volumes:
+  zeno_vault:
+    driver: local
+
+network:
+  zeno.net:
+    name: zeno.net
+    driver: bridge

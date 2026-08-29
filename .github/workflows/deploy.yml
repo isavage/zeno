@@ -1,0 +1,75 @@
+name: Deploy Zeno Assistant
+
+on:
+  workflow_dispatch:
+    inputs:
+      cleanup:
+        description: Clean the deployment directory before rebuilding
+        required: false
+        default: false
+        type: boolean
+  push:
+    branches: [main, master]
+    paths-ignore: ['.gitignore', 'README.md', 'refer deploy']
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    environment: prod-IN
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Upload application to VPS staging directory
+        uses: appleboy/scp-action@v0.1.7
+        with:
+          host: ${{ secrets.VPS_HOST }}
+          username: ${{ secrets.VPS_USER }}
+          key: ${{ secrets.VPS_SSH_KEY }}
+          port: 22
+          source: ".,!.git*,!.github*,!.gitignore"
+          target: "/tmp/zeno-deploy"
+          overwrite: true
+
+      - name: Build and restart Docker deployment
+        uses: appleboy/ssh-action@v1.0.3
+        env:
+          DOPPLER_TOKEN: ${{ secrets.DOPPLER_TOKEN }}
+          CLEANUP: ${{ inputs.cleanup || 'false' }}
+        with:
+          host: ${{ secrets.VPS_HOST }}
+          username: ${{ secrets.VPS_USER }}
+          key: ${{ secrets.VPS_SSH_KEY }}
+          port: 22
+          envs: DOPPLER_TOKEN,CLEANUP
+          script: |
+            set -euo pipefail
+
+            TARGET_DIR="/docker/zeno"
+            TEMP_DIR="/tmp/zeno-deploy"
+
+            if [ "$TARGET_DIR" != "/docker/zeno" ] || [ "$TEMP_DIR" != "/tmp/zeno-deploy" ]; then
+              echo "Refusing deployment: unsafe target path"
+              exit 1
+            fi
+
+            if [ -d "$TARGET_DIR" ]; then
+              cd "$TARGET_DIR"
+              docker compose down || true
+            fi
+
+            sudo mkdir -p "$TARGET_DIR"
+            sudo rsync -a --delete "$TEMP_DIR"/ "$TARGET_DIR"/
+            sudo rm -rf "$TEMP_DIR"
+            cd "$TARGET_DIR"
+
+            if [ "$CLEANUP" = "true" ]; then
+              docker compose down -v || true
+              sudo find . -mindepth 1 -maxdepth 1 ! -name '.env' -exec rm -rf {} +
+            fi
+
+            # Inject Doppler values directly; no .env file is created on the VPS.
+            doppler run -- docker compose up -d --build --force-recreate
+            sleep 10
+            docker compose ps
+            docker compose ps | grep -q "Up"

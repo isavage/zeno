@@ -1,0 +1,391 @@
+:root {
+    --bg-primary: #0d1117;
+    --bg-secondary: #161b22;
+    --bg-tertiary: #21262d;
+    --accent: #58a6ff;
+    --accent-hover: #1f6feb;
+    --text-primary: #f0f6fc;
+    --text-secondary: #8b949e;
+    --border-color: #30363d;
+    --user-bubble: #1f6feb;
+    --assistant-bubble: #21262d;
+    --danger: #f85149;
+    --success: #3fb950;
+    --radius-lg: 16px;
+    --radius-md: 12px;
+    --radius-sm: 8px;
+}
+
+* {
+    box-sizing: border-box;
+    margin: 0;
+    padding: 0;
+    font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    -webkit-tap-highlight-color: transparent;
+}
+
+body {
+    background-color: var(--bg-primary);
+    color: var(--text-primary);
+    min-height: 100vh;
+    display: flex;
+    justify-content: center;
+}
+
+/* ================= Login Screen ================= */
+.login-body {
+    align-items: center;
+    padding: 20px;
+}
+
+.login-card {
+    background: var(--bg-secondary);
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius-lg);
+    padding: 40px 32px;
+    width: 100%;
+    max-width: 400px;
+    text-align: center;
+    box-shadow: 0 12px 32px rgba(0, 0, 0, 0.4);
+}
+
+.logo-container .logo-icon {
+    font-size: 40px;
+    margin-bottom: 12px;
+}
+
+.logo-container h1 {
+    font-size: 28px;
+    font-weight: 700;
+    letter-spacing: -0.5px;
+}
+
+.logo-container .subtitle {
+    color: var(--text-secondary);
+    font-size: 14px;
+    margin-top: 6px;
+    margin-bottom: 30px;
+}
+
+.alert {
+    padding: 12px;
+    border-radius: var(--radius-sm);
+    font-size: 13px;
+    margin-bottom: 20px;
+}
+
+.alert-error {
+    background: rgba(248, 81, 73, 0.15);
+    border: 1px solid var(--danger);
+    color: #ff7b72;
+}
+
+.btn-oauth {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 12px;
+    width: 100%;
+    padding: 12px 16px;
+    background: var(--bg-tertiary);
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius-md);
+    color: var(--text-primary);
+    font-size: 15px;
+    font-weight: 500;
+    text-decoration: none;
+    transition: all 0.2s ease;
+    margin-bottom: 12px;
+}
+
+.btn-oauth:hover {
+    background: #30363d;
+    border-color: #8b949e;
+}
+
+.dev-input {
+    width: 100%;
+    padding: 10px 14px;
+    background: var(--bg-primary);
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius-sm);
+    color: var(--text-primary);
+    font-size: 14px;
+    outline: none;
+}
+
+.btn-primary {
+    background: var(--accent);
+    color: #ffffff;
+    border: none;
+    padding: 10px 16px;
+    border-radius: var(--radius-sm);
+    font-weight: 600;
+    cursor: pointer;
+}
+
+.login-footer {
+    margin-top: 28px;
+    font-size: 12px;
+    color: var(--text-secondary);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+}
+
+/* ================= Chat App Interface ================= */
+.app-container {
+    width: 100%;
+    max-width: 800px;
+    height: 100vh;
+    display: flex;
+    flex-direction: column;
+    background: var(--bg-primary);
+    border-left: 1px solid var(--border-color);
+    border-right: 1px solid var(--border-color);
+}
+
+.app-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 14px 20px;
+    background: var(--bg-secondary);
+    border-bottom: 1px solid var(--border-color);
+}
+
+.brand {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+}
+
+.brand-avatar {
+    width: 36px;
+    height: 36px;
+    border-radius: 50%;
+    background: linear-gradient(135deg, #1f6feb, #8957e5);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 18px;
+}
+
+.brand-info h2 {
+    font-size: 16px;
+    font-weight: 600;
+}
+
+.status-badge {
+    font-size: 11px;
+    color: var(--success);
+    display: flex;
+    align-items: center;
+    gap: 5px;
+}
+
+.status-dot {
+    width: 7px;
+    height: 7px;
+    background: var(--success);
+    border-radius: 50%;
+    box-shadow: 0 0 8px var(--success);
+}
+
+.header-actions {
+    display: flex;
+    gap: 8px;
+}
+
+.icon-btn {
+    background: transparent;
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius-sm);
+    color: var(--text-secondary);
+    padding: 8px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.2s;
+}
+
+.icon-btn:hover {
+    background: var(--bg-tertiary);
+    color: var(--text-primary);
+}
+
+/* Chat Messages */
+.chat-messages {
+    flex: 1;
+    overflow-y: auto;
+    padding: 20px;
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+}
+
+.message {
+    display: flex;
+    flex-direction: column;
+    max-width: 85%;
+    animation: fadeIn 0.2s ease-in-out;
+}
+
+.user-message {
+    align-self: flex-end;
+}
+
+.assistant-message {
+    align-self: flex-start;
+}
+
+.message-bubble {
+    padding: 12px 16px;
+    border-radius: var(--radius-lg);
+    font-size: 14.5px;
+    line-height: 1.55;
+    word-break: break-word;
+}
+
+.user-message .message-bubble {
+    background: var(--user-bubble);
+    color: #ffffff;
+    border-bottom-right-radius: 4px;
+}
+
+.assistant-message .message-bubble {
+    background: var(--assistant-bubble);
+    color: var(--text-primary);
+    border: 1px solid var(--border-color);
+    border-bottom-left-radius: 4px;
+}
+
+.message-meta {
+    font-size: 11px;
+    color: var(--text-secondary);
+    margin-top: 4px;
+    display: flex;
+    gap: 8px;
+}
+
+.tool-badge {
+    background: rgba(88, 166, 255, 0.15);
+    color: var(--accent);
+    padding: 2px 6px;
+    border-radius: 4px;
+    font-size: 10px;
+    font-weight: 500;
+}
+
+/* Voice Status Bar */
+.voice-status-bar {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 12px;
+    background: rgba(31, 111, 235, 0.15);
+    border-top: 1px solid var(--accent);
+    padding: 10px 16px;
+    color: var(--accent);
+    font-size: 13px;
+    font-weight: 500;
+}
+
+.pulse-wave {
+    display: flex;
+    gap: 4px;
+    align-items: center;
+}
+
+.pulse-wave span {
+    width: 3px;
+    height: 12px;
+    background: var(--accent);
+    border-radius: 2px;
+    animation: wave 1s infinite ease-in-out;
+}
+
+.pulse-wave span:nth-child(2) { animation-delay: 0.2s; height: 18px; }
+.pulse-wave span:nth-child(3) { animation-delay: 0.4s; height: 24px; }
+.pulse-wave span:nth-child(4) { animation-delay: 0.2s; height: 18px; }
+.pulse-wave span:nth-child(5) { animation-delay: 0s; height: 12px; }
+
+@keyframes wave {
+    0%, 100% { transform: scaleY(0.5); }
+    50% { transform: scaleY(1.3); }
+}
+
+@keyframes fadeIn {
+    from { opacity: 0; transform: translateY(6px); }
+    to { opacity: 1; transform: translateY(0); }
+}
+
+/* Input Container */
+.input-container {
+    padding: 14px 20px;
+    background: var(--bg-secondary);
+    border-top: 1px solid var(--border-color);
+}
+
+.chat-form {
+    display: flex;
+    align-items: flex-end;
+    background: var(--bg-primary);
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius-lg);
+    padding: 6px 10px;
+    gap: 8px;
+}
+
+.chat-form:focus-within {
+    border-color: var(--accent);
+}
+
+.chat-form textarea {
+    flex: 1;
+    background: transparent;
+    border: none;
+    color: var(--text-primary);
+    font-size: 14.5px;
+    resize: none;
+    outline: none;
+    max-height: 120px;
+    padding: 8px 4px;
+    line-height: 1.4;
+}
+
+.mic-button, .send-button {
+    background: transparent;
+    border: none;
+    color: var(--text-secondary);
+    padding: 8px;
+    border-radius: 50%;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.2s ease;
+}
+
+.mic-button:hover, .send-button:hover {
+    color: var(--accent);
+    background: var(--bg-tertiary);
+}
+
+.mic-button.recording {
+    background: var(--danger) !important;
+    color: #ffffff !important;
+    animation: pulseMic 1.5s infinite;
+}
+
+@keyframes pulseMic {
+    0% { transform: scale(1); box-shadow: 0 0 0 0 rgba(248, 81, 73, 0.7); }
+    70% { transform: scale(1.1); box-shadow: 0 0 0 10px rgba(248, 81, 73, 0); }
+    100% { transform: scale(1); box-shadow: 0 0 0 0 rgba(248, 81, 73, 0); }
+}
+
+.hidden {
+    display: none !important;
+}

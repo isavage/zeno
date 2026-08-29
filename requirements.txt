@@ -1,0 +1,32 @@
+# Web Framework & Server
+fastapi>=0.115.0
+uvicorn[standard]>=0.32.0
+jinja2>=3.1.4
+python-multipart>=0.0.12
+aiofiles>=24.1.0
+
+# Settings & Configuration
+pydantic>=2.9.0
+pydantic-settings>=2.6.0
+python-dotenv>=1.0.1
+
+# LLM Providers & Networking
+httpx>=0.27.2
+openai>=1.54.0
+
+# Encryption & Security
+cryptography>=43.0.3
+authlib>=1.3.2
+itsdangerous>=2.2.0
+
+# Telegram Bot
+python-telegram-bot[job-queue]>=21.6
+
+# Voice: Speech-to-Text & Text-to-Speech
+faster-whisper>=1.0.3
+kokoro>=0.8.4
+soundfile>=0.12.1
+numpy>=1.26.0
+
+# Tooling & Utilities
+beautifulsoup4>=4.12.3
