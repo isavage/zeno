@@ -58,7 +58,12 @@ app = FastAPI(
 )
 
 # Session middleware for auth
-app.add_middleware(SessionMiddleware, secret_key=settings.APP_SECRET_KEY, max_age=14 * 86400)
+app.add_middleware(
+    SessionMiddleware,
+    secret_key=settings.APP_SECRET_KEY,
+    max_age=14 * 86400,
+    same_site="lax",
+)
 
 app.add_middleware(TrustedHostMiddleware, allowed_hosts=settings.allowed_hosts)
 app.add_middleware(CORSMiddleware,
@@ -196,7 +201,11 @@ async def oauth_login(provider: str, request: Request):
     if not client:
         return RedirectResponse(url="/login?error=OAuth+provider+not+configured")
 
-    redirect_uri = settings.GOOGLE_REDIRECT_URI if provider == "google" else settings.MICROSOFT_REDIRECT_URI
+    # Use the current request host so the session cookie and OAuth callback
+    # stay on the same origin. Hardcoding localhost here can trigger
+    # Authlib's mismatching_state error when the app is accessed through a
+    # different host, IP, or reverse proxy.
+    redirect_uri = str(request.url_for("oauth_callback", provider=provider))
     return await client.authorize_redirect(request, redirect_uri)
 
 @app.get("/auth/{provider}/callback")
