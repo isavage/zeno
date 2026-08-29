@@ -1,6 +1,6 @@
 from typing import List, Optional, Dict, Any
 from pydantic_settings import BaseSettings, SettingsConfigDict
-from pydantic import Field, field_validator
+from pydantic import Field, field_validator, AliasChoices
 import os
 from pathlib import Path
 from dotenv import load_dotenv
@@ -34,7 +34,10 @@ class Settings(BaseSettings):
     DEFAULT_REASONING_MODEL: str = "gpt-5.4-mini"
     DEFAULT_FALLBACK_MODEL: str = "minimax/minimax-m3:free"
     ALLOWED_HOSTS: str = "localhost,127.0.0.1"  # comma‑separated list of hostnames allowed by TrustedHostMiddleware
-    ADMIN_EMAILS: str = ""  # comma‑separated list of admin user emails
+    ADMIN_EMAILS: str = Field(
+        default="",
+        validation_alias=AliasChoices("ADMIN_EMAILS", "admin_emails"),
+    )  # comma‑separated list of admin user emails
 
     @property
     def allowed_hosts(self) -> List[str]:

@@ -73,6 +73,6 @@ async def get_current_admin_user(request: Request) -> Dict[str, Any]:
     if not is_admin_user(user):
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
-            detail="Admin access required."
+            detail=f"Admin access required for {user.get('email', 'unknown')}"
         )
     return user

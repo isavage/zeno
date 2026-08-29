@@ -212,6 +212,11 @@ async def login_page(request: Request, error: Optional[str] = None):
         },
     )
 
+@app.get("/auth/logout")
+async def logout(request: Request):
+    request.session.clear()
+    return RedirectResponse(url="/login")
+
 @app.get("/auth/{provider}")
 async def oauth_login(provider: str, request: Request):
     if provider not in ("google", "microsoft"):
@@ -238,7 +243,7 @@ async def oauth_callback(provider: str, request: Request):
     try:
         token = await client.authorize_access_token(request)
         user_info = token.get("userinfo") or await client.userinfo(token=token)
-        email = user_info.get("email")
+        email = (user_info.get("email") or "").strip().lower()
 
         if not is_email_authorized(email):
             logger.warning(f"Unauthorized login attempt with email: {email}")
@@ -260,17 +265,13 @@ async def dev_login(request: Request, email: str = Form(...)):
     if not is_email_authorized(email):
         return RedirectResponse(url="/login?error=Access+Denied:+Email+not+in+whitelist", status_code=status.HTTP_303_SEE_OTHER)
 
+    normalized_email = email.strip().lower()
     request.session["user"] = {
-        "email": email.strip().lower(),
-        "name": email.split("@")[0],
+        "email": normalized_email,
+        "name": normalized_email.split("@")[0],
         "provider": "dev"
     }
     return RedirectResponse(url="/", status_code=status.HTTP_303_SEE_OTHER)
-
-@app.get("/auth/logout")
-async def logout(request: Request):
-    request.session.clear()
-    return RedirectResponse(url="/login")
 
 # ----------------- Agent REST APIs -----------------
 
