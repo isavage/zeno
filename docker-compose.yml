@@ -7,6 +7,8 @@ services:
     restart: unless-stopped
     ports:
       - "${PORT:-8000}"
+    networks:
+      - zeno.net
     environment:
       # Doppler passes all secrets directly into environment variables at runtime
       - PORT=${PORT:-8000}
