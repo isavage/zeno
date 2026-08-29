@@ -90,7 +90,10 @@ async def health_check():
         "status": "healthy",
         "service": "zeno",
         "telegram_enabled": bool(settings.TELEGRAM_BOT_TOKEN),
-        "auth_provider": settings.AUTH_PROVIDER
+        "oauth_providers": {
+            "google": bool(settings.GOOGLE_CLIENT_ID and settings.GOOGLE_CLIENT_SECRET),
+            "microsoft": bool(settings.MICROSOFT_CLIENT_ID and settings.MICROSOFT_CLIENT_SECRET),
+        },
     }
 
 # ----------------- Web UI & Authentication -----------------

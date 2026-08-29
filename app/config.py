@@ -61,7 +61,6 @@ class Settings(BaseSettings):
     ENABLE_TELEGRAM_VOICE_REPLIES: bool = True
 
     # Web UI Auth
-    AUTH_PROVIDER: str = "google"  # 'google' or 'microsoft'
     AUTHORIZED_EMAILS: str = ""
 
     # Google OAuth
