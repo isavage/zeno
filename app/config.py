@@ -33,9 +33,9 @@ class Settings(BaseSettings):
     MOONSHOT_API_KEY: Optional[str] = None
     OPENROUTER_API_KEY: Optional[str] = None
 
-    DEFAULT_FAST_MODEL: str = "nousresearch/hermes-3-llama-3.1-8b"
+    DEFAULT_FAST_MODEL: str = "z-ai/glm-5.2:free"
     DEFAULT_REASONING_MODEL: str = "gpt-5.4-mini"
-    DEFAULT_FALLBACK_MODEL: str = "meta-llama/llama-3.3-70b-instruct:free"
+    DEFAULT_FALLBACK_MODEL: str = "minimax/minimax-m3:free"
     ALLOWED_HOSTS: str = "localhost,127.0.0.1"  # comma‑separated list of hostnames allowed by TrustedHostMiddleware
     ADMIN_EMAILS: str = ""  # comma‑separated list of admin user emails
 

@@ -1,0 +1,39 @@
+{% extends "base.html" %}
+
+{% block title %}API Usage Dashboard{% endblock %}
+
+{% block content %}
+<h1>API Usage Dashboard</h1>
+{% if usage %}
+<table class="table table-striped">
+    <thead>
+        <tr>
+            <th>User Email</th>
+            <th>Provider</th>
+            <th>Model</th>
+            <th>Request Tokens</th>
+            <th>Response Tokens</th>
+            <th>Total Tokens</th>
+            <th>Recorded At</th>
+        </tr>
+    </thead>
+    <tbody>
+        {% for row in usage %}
+        <tr>
+            <td>{{ row.user_email }}</td>
+            <td>{{ row.provider }}</td>
+            <td>{{ row.model }}</td>
+            <td>{{ row.request_tokens }}</td>
+            <td>{{ row.response_tokens }}</td>
+            <td>{{ row.total_tokens }}</td>
+            <td>{{ row.recorded_at }}</td>
+        </tr>
+        {% endfor %}
+    </tbody>
+</table>
+{% else %}
+<p>No usage data recorded yet.</p>
+{% endif %}
+<p><a href="/admin/models">Back to Admin Home</a></p>
+{% endblock %}
+

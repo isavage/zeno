@@ -71,7 +71,7 @@ app.add_middleware(CORSMiddleware,
 # Static files & Templates
 BASE_DIR = Path(__file__).resolve().parent
 app.mount("/static", StaticFiles(directory=str(BASE_DIR / "web" / "static")), name="static")
-templates = Jinja2Templates(directory=str(BASE_DIR / "web" / "templates"))
+jinja_templates = Jinja2Templates(directory=str(BASE_DIR / "web" / "templates"))
 
 # Audio temporary cache dir
 AUDIO_CACHE_DIR = Path(tempfile.gettempdir()) / "zeno_audio_cache"
@@ -135,12 +135,21 @@ def set_defaults(
     prefs.set_prefs(fast_model, reasoning_model, fallback_model)
     return {"status": "ok", "message": "Preferences saved"}
 
+@admin_router.get("/usage", response_class=HTMLResponse)
+def admin_usage(request: Request, _: None = Depends(verify_admin)):
+    """Render admin usage dashboard showing per‑user token usage."""
+    usage_data = usage_store.get_all()
+    return jinja_templates.TemplateResponse(
+        "admin_usage.html",
+        {"request": request, "usage": usage_data},
+    )
+
 app.include_router(admin_router)
 
 # Settings page – simple UI to edit defaults (template to be created at templates/settings.html)
 @app.get("/settings", response_class=HTMLResponse)
 async def settings_page(request: Request):
-    return templates.TemplateResponse(
+    return jinja_templates.TemplateResponse(
         "settings.html",
         {
             "request": request,
@@ -156,7 +165,7 @@ async def index(request: Request):
     user = request.session.get("user")
     if not user:
         return RedirectResponse(url="/login")
-    return templates.TemplateResponse("index.html", {"request": request, "user": user})
+    return jinja_templates.TemplateResponse("index.html", {"request": request, "user": user})
 
 @app.get("/login", response_class=HTMLResponse)
 async def login_page(request: Request, error: Optional[str] = None):
@@ -167,11 +176,11 @@ async def login_page(request: Request, error: Optional[str] = None):
     google_enabled = bool(settings.GOOGLE_CLIENT_ID and settings.GOOGLE_CLIENT_SECRET)
     ms_enabled = bool(settings.MICROSOFT_CLIENT_ID and settings.MICROSOFT_CLIENT_SECRET)
 
-    return templates.TemplateResponse("login.html", {
+    return jinja_templates.TemplateResponse("login.html", {
         "request": request,
         "google_enabled": google_enabled,
         "ms_enabled": ms_enabled,
-        "error": error
+        "error": error,
     })
 
 @app.get("/auth/{provider}")

@@ -2,6 +2,7 @@ import json
 import logging
 from typing import List, Dict, Any, Optional
 from app.config import settings
+from app.agent.usage import usage_store
 from app.agent.providers import provider_manager
 from app.agent.router import model_router
 from app.agent.tools import tool_registry
@@ -55,9 +56,10 @@ class HermesAgent:
 
         # 5. Model execution & fallback loop
         for model_name in candidate_models:
-            client, target_model = provider_manager.get_client_for_model(model_name)
+            client, provider_key, target_model = provider_manager.get_client_for_model(model_name)
             if not client:
                 continue
+
 
             try:
                 working_messages = list(messages)
@@ -105,6 +107,23 @@ class HermesAgent:
                         # Model generated final text reply
                         reply_content = message.content or ""
                         memory_store.add_message(session_id, "assistant", reply_content)
+
+                        # Record token usage
+                        try:
+                            usage = response.usage
+                            request_tokens = getattr(usage, "prompt_tokens", 0)
+                            response_tokens = getattr(usage, "completion_tokens", 0)
+                            total_tokens = getattr(usage, "total_tokens", request_tokens + response_tokens)
+                            usage_store.record(
+                                user_email=session_id,
+                                provider=provider_key,
+                                model=target_model,
+                                request_tokens=request_tokens,
+                                response_tokens=response_tokens,
+                                total_tokens=total_tokens,
+                            )
+                        except Exception as e:
+                            logger.debug(f"Failed to record usage: {e}")
 
                         return {
                             "response": reply_content,

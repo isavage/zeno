@@ -40,31 +40,36 @@ class LLMProviderManager:
                 base_url="https://openrouter.ai/api/v1"
             )
 
-    def get_client_for_model(self, model_name: str) -> Tuple[Optional[AsyncOpenAI], str]:
-        """Resolves the appropriate AsyncOpenAI client and model name."""
+    def get_client_for_model(self, model_name: str) -> Tuple[Optional[AsyncOpenAI], str, str]:
+        """Resolves the appropriate AsyncOpenAI client, provider key, and model name.
+        Returns (client, provider_key, effective_model) or (None, "", model_name) if unavailable.
+        """
+        # DeepSeek
         if model_name.startswith("deepseek") and "deepseek" in self._clients:
-            return self._clients["deepseek"], model_name
+            return self._clients["deepseek"], "deepseek", model_name
+        # OpenAI models
         elif model_name.startswith("gpt") or model_name.startswith("o1") or model_name.startswith("o3"):
             if "openai" in self._clients:
-                return self._clients["openai"], model_name
+                return self._clients["openai"], "openai", model_name
+        # Moonshot/Kimi
         elif model_name.startswith("moonshot") and "kimi" in self._clients:
-            return self._clients["kimi"], model_name
+            return self._clients["kimi"], "kimi", model_name
 
         # Default / OpenRouter fallback
         if "openrouter" in self._clients:
-            return self._clients["openrouter"], model_name
+            return self._clients["openrouter"], "openrouter", model_name
         elif "openai" in self._clients:
-            return self._clients["openai"], "gpt-4o-mini"
+            # fallback to a safe default OpenAI model
+            return self._clients["openai"], "openai", "gpt-4o-mini"
         elif "deepseek" in self._clients:
-            return self._clients["deepseek"], "deepseek-chat"
+            return self._clients["deepseek"], "deepseek", "deepseek-chat"
 
         # Fallback to any initialized client
         if self._clients:
-            first_provider = next(iter(self._clients.values()))
-            return first_provider, model_name
+            first_key = next(iter(self._clients))
+            return self._clients[first_key], first_key, model_name
 
-        return None, model_name
-
+        return None, "", model_name
     def has_any_provider(self) -> bool:
         return len(self._clients) > 0
 
