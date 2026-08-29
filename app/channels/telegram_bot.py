@@ -165,7 +165,14 @@ class TelegramBotManager:
             logger.info("Starting Telegram Bot long-polling...")
             await self.app.initialize()
             await self.app.start()
-            await self.app.updater.start_polling()
+            try:
+                await self.app.updater.start_polling()
+            except Exception as e:
+                # Telegram token errors (e.g., InvalidToken) raise generic Exception
+                logger.error(f"Telegram bot failed to start: {e}. Bot will remain disabled.")
+                # Disable the bot by clearing the app reference
+                self.app = None
+
 
     async def stop(self):
         if self.app and self.app.updater:
