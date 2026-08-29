@@ -17,7 +17,7 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from app.config import settings
 from app.security.auth import oauth, is_email_authorized, get_current_user
-from app.security.encryption import vault_cipher
+from app.agent.usage import usage_store
 from app.agent.core import zeno_agent
 from app.agent.memory import memory_store
 from app.voice.stt import stt_engine
@@ -140,8 +140,9 @@ def admin_usage(request: Request, _: None = Depends(verify_admin)):
     """Render admin usage dashboard showing per‑user token usage."""
     usage_data = usage_store.get_all()
     return jinja_templates.TemplateResponse(
+        request,
         "admin_usage.html",
-        {"request": request, "usage": usage_data},
+        {"usage": usage_data},
     )
 
 app.include_router(admin_router)
@@ -150,9 +151,9 @@ app.include_router(admin_router)
 @app.get("/settings", response_class=HTMLResponse)
 async def settings_page(request: Request):
     return jinja_templates.TemplateResponse(
+        request,
         "settings.html",
         {
-            "request": request,
             "admin_token": settings.ADMIN_TOKEN,
             "authorized_emails": settings.authorized_emails_list,
         },
@@ -165,7 +166,7 @@ async def index(request: Request):
     user = request.session.get("user")
     if not user:
         return RedirectResponse(url="/login")
-    return jinja_templates.TemplateResponse("index.html", {"request": request, "user": user})
+    return jinja_templates.TemplateResponse(request, "index.html", {"user": user})
 
 @app.get("/login", response_class=HTMLResponse)
 async def login_page(request: Request, error: Optional[str] = None):
@@ -176,12 +177,15 @@ async def login_page(request: Request, error: Optional[str] = None):
     google_enabled = bool(settings.GOOGLE_CLIENT_ID and settings.GOOGLE_CLIENT_SECRET)
     ms_enabled = bool(settings.MICROSOFT_CLIENT_ID and settings.MICROSOFT_CLIENT_SECRET)
 
-    return jinja_templates.TemplateResponse("login.html", {
-        "request": request,
-        "google_enabled": google_enabled,
-        "ms_enabled": ms_enabled,
-        "error": error,
-    })
+    return jinja_templates.TemplateResponse(
+        request,
+        "login.html",
+        {
+            "google_enabled": google_enabled,
+            "ms_enabled": ms_enabled,
+            "error": error,
+        },
+    )
 
 @app.get("/auth/{provider}")
 async def oauth_login(provider: str, request: Request):
