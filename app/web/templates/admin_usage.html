@@ -1,9 +1,10 @@
 {% extends "base.html" %}
 
 {% block title %}API Usage Dashboard{% endblock %}
+{% block header_title %}Usage Dashboard{% endblock %}
 
 {% block content %}
-<h1>API Usage Dashboard</h1>
+<p class="admin-intro">Per-user token usage across providers and models.</p>
 {% if usage %}
 <table class="table table-striped">
     <thead>
@@ -34,6 +35,5 @@
 {% else %}
 <p>No usage data recorded yet.</p>
 {% endif %}
-<p><a href="/admin/models">Back to Admin Home</a></p>
+<p><a href="/admin" class="admin-inline-link">Back to Admin Home</a></p>
 {% endblock %}
-

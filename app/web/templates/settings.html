@@ -2,33 +2,41 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>Zeno Settings</title>
-    <style>
-        body {font-family: Arial, sans-serif; margin: 2rem;}
-        label {display: block; margin-top: 1rem;}
-        select {width: 100%; max-width: 400px; padding: 0.5rem;}
-        button {margin-top: 1rem; padding: 0.5rem 1rem;}
-        #status {margin-top: 1rem; color: green;}
-    </style>
+    <link rel="stylesheet" href="/static/style.css">
 </head>
-<body>
-    <h1>Zeno Model Settings</h1>
-    <form id="settings-form">
-        <label for="fast-model">Fast Model:</label>
-        <select id="fast-model" name="fast_model"></select>
+<body class="admin-body">
+    <div class="admin-shell">
+        <header class="admin-topbar">
+            <div>
+                <div class="admin-kicker">Zeno Control Panel</div>
+                <h1>Model Settings</h1>
+            </div>
+            <div class="admin-topbar-actions">
+                <a class="admin-topbar-link" href="/admin">Admin Home</a>
+                <a class="admin-topbar-link" href="/">Open App</a>
+            </div>
+        </header>
 
-        <label for="reasoning-model">Reasoning Model:</label>
-        <select id="reasoning-model" name="reasoning_model"></select>
+        <main class="admin-content">
+            <form id="settings-form" class="admin-form">
+                <label for="fast-model">Fast Model</label>
+                <select id="fast-model" name="fast_model"></select>
 
-        <label for="fallback-model">Fallback Model:</label>
-        <select id="fallback-model" name="fallback_model"></select>
+                <label for="reasoning-model">Reasoning Model</label>
+                <select id="reasoning-model" name="reasoning_model"></select>
 
-        <button type="submit">Save Settings</button>
-    </form>
-    <div id="status"></div>
+                <label for="fallback-model">Fallback Model</label>
+                <select id="fallback-model" name="fallback_model"></select>
+
+                <button type="submit" class="admin-primary-btn">Save Settings</button>
+            </form>
+            <div id="status" class="admin-status"></div>
+        </main>
+    </div>
 
     <script>
-        const adminToken = "{{ admin_token }}"; // injected from FastAPI
         const modelsEndpoint = "/admin/models";
         const defaultsEndpoint = "/admin/defaults";
         const setEndpoint = "/admin/defaults";
@@ -74,8 +82,7 @@
                 const resp = await fetch(setEndpoint, {
                     method: 'POST',
                     headers: {
-                        'Content-Type': 'application/x-www-form-urlencoded',
-                        'Token': adminToken
+                        'Content-Type': 'application/x-www-form-urlencoded'
                     },
                     body: payload
                 });
@@ -96,4 +103,3 @@
     </script>
 </body>
 </html>
-

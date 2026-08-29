@@ -7,7 +7,7 @@ from pathlib import Path
 from typing import Optional, Dict, Any
 from typing import List, Optional, Dict, Any
 
-from fastapi import FastAPI, Request, Form, UploadFile, File, HTTPException, status, Header, Depends, APIRouter
+from fastapi import FastAPI, Request, Form, UploadFile, File, HTTPException, status, Depends, APIRouter
 from fastapi.responses import HTMLResponse, RedirectResponse, JSONResponse, FileResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
@@ -16,7 +16,7 @@ from starlette.middleware.sessions import SessionMiddleware
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.config import settings
-from app.security.auth import oauth, is_email_authorized, get_current_user
+from app.security.auth import oauth, is_email_authorized, get_current_user, get_current_admin_user, is_admin_user
 from app.agent.usage import usage_store
 from app.agent.core import zeno_agent
 from app.agent.memory import memory_store
@@ -98,11 +98,6 @@ async def health_check():
 # ----------------- Admin API for model defaults -----------------
 admin_router = APIRouter(prefix="/admin", tags=["admin"])
 
-def verify_admin(token: str = Header(..., description="Admin token")):
-    if token != settings.ADMIN_TOKEN:
-        raise HTTPException(status_code=401, detail="Invalid admin token")
-
-
 def build_redirect_uri(request: Request, path: str) -> str:
     """Build an absolute redirect URI using the current request origin."""
     forwarded_host = request.headers.get("x-forwarded-host")
@@ -113,8 +108,21 @@ def build_redirect_uri(request: Request, path: str) -> str:
     normalized_path = path if path.startswith("/") else f"/{path}"
     return f"{scheme}://{host}{normalized_path}"
 
+@admin_router.get("")
+@admin_router.get("/")
+async def admin_home(request: Request, user: Dict[str, Any] = Depends(get_current_admin_user)):
+    return jinja_templates.TemplateResponse(
+        request,
+        "admin_home.html",
+        {
+            "user": user,
+            "admin_user": True,
+        },
+    )
+
+
 @admin_router.get("/models")
-def list_models():
+def list_models(_: Dict[str, Any] = Depends(get_current_admin_user)):
     """Return a dict of provider -> list of model identifiers.
     This is a static list; extend as needed.
     """
@@ -131,7 +139,7 @@ def list_models():
     }
 
 @admin_router.get("/defaults")
-def get_defaults():
+def get_defaults(_: Dict[str, Any] = Depends(get_current_admin_user)):
     return prefs.get_prefs()
 
 @admin_router.post("/defaults")
@@ -139,7 +147,7 @@ def set_defaults(
     fast_model: str,
     reasoning_model: str,
     fallback_model: str,
-    _: None = Depends(verify_admin),
+    _: Dict[str, Any] = Depends(get_current_admin_user),
 ):
     # Basic validation against known models
     known = set()
@@ -152,7 +160,7 @@ def set_defaults(
     return {"status": "ok", "message": "Preferences saved"}
 
 @admin_router.get("/usage", response_class=HTMLResponse)
-def admin_usage(request: Request, _: None = Depends(verify_admin)):
+def admin_usage(request: Request, _: Dict[str, Any] = Depends(get_current_admin_user)):
     """Render admin usage dashboard showing per‑user token usage."""
     usage_data = usage_store.get_all()
     return jinja_templates.TemplateResponse(
@@ -165,13 +173,14 @@ app.include_router(admin_router)
 
 # Settings page – simple UI to edit defaults (template to be created at templates/settings.html)
 @app.get("/settings", response_class=HTMLResponse)
-async def settings_page(request: Request):
+async def settings_page(request: Request, user: Dict[str, Any] = Depends(get_current_admin_user)):
     return jinja_templates.TemplateResponse(
         request,
         "settings.html",
         {
-            "admin_token": settings.ADMIN_TOKEN,
             "authorized_emails": settings.authorized_emails_list,
+            "user": user,
+            "admin_user": True,
         },
     )
 
@@ -182,7 +191,7 @@ async def index(request: Request):
     user = request.session.get("user")
     if not user:
         return RedirectResponse(url="/login")
-    return jinja_templates.TemplateResponse(request, "index.html", {"user": user})
+    return jinja_templates.TemplateResponse(request, "index.html", {"user": user, "admin_user": is_admin_user(user)})
 
 @app.get("/login", response_class=HTMLResponse)
 async def login_page(request: Request, error: Optional[str] = None):

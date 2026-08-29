@@ -42,6 +42,20 @@ def is_email_authorized(email: Optional[str]) -> bool:
         return True
     return email.strip().lower() in authorized
 
+
+def is_admin_email(email: Optional[str]) -> bool:
+    """Return True when the email belongs to the configured admin list."""
+    if not email:
+        return False
+    return email.strip().lower() in settings.admin_emails
+
+
+def is_admin_user(user: Optional[Dict[str, Any]]) -> bool:
+    """Return True when the authenticated session belongs to an admin user."""
+    if not user:
+        return False
+    return is_admin_email(user.get("email"))
+
 async def get_current_user(request: Request) -> Dict[str, Any]:
     """Dependency / Helper to retrieve current authenticated user from session."""
     user = request.session.get("user")
@@ -49,5 +63,16 @@ async def get_current_user(request: Request) -> Dict[str, Any]:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Not authenticated. Please sign in via Google or Microsoft."
+        )
+    return user
+
+
+async def get_current_admin_user(request: Request) -> Dict[str, Any]:
+    """Dependency / Helper to retrieve the current authenticated admin user."""
+    user = await get_current_user(request)
+    if not is_admin_user(user):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Admin access required."
         )
     return user

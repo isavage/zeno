@@ -24,9 +24,6 @@ class Settings(BaseSettings):
     # Encryption Master Key (32 url-safe base64 / Fernet key)
     ZENOS_ENCRYPTION_KEY: Optional[str] = None
 
-    # Admin token for privileged API access (must be set in environment)
-    ADMIN_TOKEN: str = Field(default="CHANGE_ME_ADMIN_TOKEN")
-
     # LLM API Keys
     OPENAI_API_KEY: Optional[str] = None
     DEEPSEEK_API_KEY: Optional[str] = None

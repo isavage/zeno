@@ -198,6 +198,35 @@ body {
     gap: 8px;
 }
 
+.header-link {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    padding: 8px 12px;
+    border-radius: var(--radius-sm);
+    border: 1px solid var(--border-color);
+    color: var(--text-secondary);
+    text-decoration: none;
+    font-size: 13px;
+    font-weight: 600;
+    transition: all 0.2s ease;
+}
+
+.header-link:hover {
+    background: var(--bg-tertiary);
+    color: var(--text-primary);
+}
+
+.admin-link {
+    color: var(--accent);
+    border-color: rgba(88, 166, 255, 0.35);
+}
+
+.admin-link:hover {
+    background: rgba(88, 166, 255, 0.1);
+    color: #9fd0ff;
+}
+
 .icon-btn {
     background: transparent;
     border: 1px solid var(--border-color);
@@ -214,6 +243,176 @@ body {
 .icon-btn:hover {
     background: var(--bg-tertiary);
     color: var(--text-primary);
+}
+
+/* ================= Admin Pages ================= */
+.admin-body {
+    align-items: flex-start;
+    padding: 24px;
+}
+
+.admin-shell {
+    width: 100%;
+    max-width: 960px;
+}
+
+.admin-topbar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 16px;
+    padding: 20px 22px;
+    margin-bottom: 18px;
+    background: linear-gradient(135deg, rgba(22, 27, 34, 0.96), rgba(17, 23, 35, 0.96));
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius-lg);
+    box-shadow: 0 12px 32px rgba(0, 0, 0, 0.24);
+}
+
+.admin-kicker {
+    color: var(--accent);
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    margin-bottom: 4px;
+}
+
+.admin-topbar h1 {
+    font-size: 24px;
+    font-weight: 700;
+    letter-spacing: -0.03em;
+}
+
+.admin-topbar-actions {
+    display: flex;
+    gap: 10px;
+    flex-wrap: wrap;
+}
+
+.admin-topbar-link,
+.admin-inline-link {
+    color: var(--text-primary);
+    text-decoration: none;
+}
+
+.admin-topbar-link {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    padding: 10px 14px;
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius-sm);
+    background: var(--bg-secondary);
+    font-size: 13px;
+    font-weight: 600;
+}
+
+.admin-topbar-link:hover {
+    background: var(--bg-tertiary);
+}
+
+.admin-content {
+    padding: 4px 2px 0;
+}
+
+.admin-hero {
+    margin-bottom: 18px;
+}
+
+.admin-intro {
+    color: var(--text-secondary);
+    font-size: 14px;
+    line-height: 1.6;
+}
+
+.admin-grid {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 16px;
+}
+
+.admin-card {
+    display: block;
+    padding: 20px;
+    background: var(--bg-secondary);
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius-lg);
+    text-decoration: none;
+    color: var(--text-primary);
+    transition: transform 0.18s ease, border-color 0.18s ease, background 0.18s ease;
+}
+
+.admin-card:hover {
+    transform: translateY(-2px);
+    border-color: rgba(88, 166, 255, 0.45);
+    background: #1b212b;
+}
+
+.admin-card-eyebrow {
+    color: var(--accent);
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    margin-bottom: 10px;
+}
+
+.admin-card h2 {
+    font-size: 20px;
+    margin-bottom: 8px;
+}
+
+.admin-card p {
+    color: var(--text-secondary);
+    line-height: 1.55;
+}
+
+.admin-form {
+    display: grid;
+    gap: 12px;
+    max-width: 520px;
+    padding: 20px;
+    background: var(--bg-secondary);
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius-lg);
+}
+
+.admin-form label {
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--text-secondary);
+}
+
+.admin-form select {
+    width: 100%;
+    padding: 12px 14px;
+    background: var(--bg-primary);
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius-sm);
+    color: var(--text-primary);
+    outline: none;
+}
+
+.admin-primary-btn {
+    margin-top: 6px;
+    padding: 12px 16px;
+    border: none;
+    border-radius: var(--radius-sm);
+    background: var(--accent);
+    color: white;
+    font-weight: 700;
+    cursor: pointer;
+}
+
+.admin-primary-btn:hover {
+    background: var(--accent-hover);
+}
+
+.admin-status {
+    margin-top: 14px;
+    color: var(--success);
+    font-size: 14px;
 }
 
 /* Chat Messages */

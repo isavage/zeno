@@ -1,0 +1,24 @@
+{% extends "base.html" %}
+
+{% block title %}Zeno Admin{% endblock %}
+{% block header_title %}Admin Home{% endblock %}
+
+{% block content %}
+<section class="admin-hero">
+    <p class="admin-intro">Manage assistant defaults and inspect usage for authorized admin accounts.</p>
+</section>
+
+<div class="admin-grid">
+    <a href="/settings" class="admin-card">
+        <div class="admin-card-eyebrow">Configuration</div>
+        <h2>Model Settings</h2>
+        <p>Adjust fast, reasoning, and fallback model defaults.</p>
+    </a>
+
+    <a href="/admin/usage" class="admin-card">
+        <div class="admin-card-eyebrow">Reporting</div>
+        <h2>Usage Dashboard</h2>
+        <p>Review per-user token usage across providers and models.</p>
+    </a>
+</div>
+{% endblock %}
