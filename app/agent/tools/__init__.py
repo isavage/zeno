@@ -38,10 +38,13 @@ class ToolRegistry:
         return bool(email and email in settings.admin_emails)
 
     def _admin_tool_allowed_for_session(self, session_id: str) -> bool:
-        if not session_id.startswith("web_"):
-            return False
-        email = session_id[4:].split(":", 1)[0].strip().lower()
-        return bool(email and email in settings.admin_emails)
+        if session_id.startswith("web_"):
+            email = session_id[4:].split(":", 1)[0].strip().lower()
+            return bool(email and email in settings.admin_emails)
+        if session_id.startswith("tg_"):
+            raw_user_id = session_id[3:].strip()
+            return raw_user_id.isdigit() and int(raw_user_id) in settings.telegram_admin_user_ids
+        return False
 
     def get_openai_schemas(self, session_id: str = "") -> List[Dict[str, Any]]:
         return [

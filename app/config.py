@@ -56,6 +56,7 @@ class Settings(BaseSettings):
 
     TELEGRAM_BOT_TOKEN: Optional[str] = None
     TELEGRAM_ALLOWED_USER_IDS: str = ""
+    TELEGRAM_ADMIN_USER_IDS: str = ""
     ENABLE_TELEGRAM_VOICE_REPLIES: bool = True
 
     # Host-level Docker access is opt-in and limited to the configured containers.
@@ -93,6 +94,17 @@ class Settings(BaseSettings):
             return []
         ids = []
         for raw in self.TELEGRAM_ALLOWED_USER_IDS.split(","):
+            raw = raw.strip()
+            if raw.isdigit():
+                ids.append(int(raw))
+        return ids
+
+    @property
+    def telegram_admin_user_ids(self) -> List[int]:
+        if not self.TELEGRAM_ADMIN_USER_IDS:
+            return []
+        ids = []
+        for raw in self.TELEGRAM_ADMIN_USER_IDS.split(","):
             raw = raw.strip()
             if raw.isdigit():
                 ids.append(int(raw))
