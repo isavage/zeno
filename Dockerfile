@@ -16,6 +16,9 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     build-essential \
     && rm -rf /var/lib/apt/lists/*
 
+# Fail the image build if the Docker client was not installed.
+RUN docker --version
+
 WORKDIR /app
 
 # Copy requirements and install python packages
