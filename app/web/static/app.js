@@ -9,8 +9,10 @@ document.addEventListener("DOMContentLoaded", () => {
     const audioPlayer = document.getElementById("audioPlayer");
     const voiceToggleBtn = document.getElementById("voiceToggleBtn");
     const voiceToggleLabel = document.getElementById("voiceToggleLabel");
+    const stopSpeakingBtn = document.getElementById("stopSpeakingBtn");
     const voiceTranscript = document.getElementById("voiceTranscript");
     const chatList = document.getElementById("chatList");
+    const agentStatus = document.getElementById("agentStatus");
 
     let mediaRecorder = null;
     let mediaStream = null;
@@ -23,6 +25,9 @@ document.addEventListener("DOMContentLoaded", () => {
     let recordingDraftMessage = null;
     let activeChatId = localStorage.getItem("zenoActiveChatId") || "default";
     let chatCache = [];
+    let isBotSpeaking = false;
+    let audioQueue = [];
+    let isAudioPlaying = false;
     let voiceRepliesEnabled = localStorage.getItem("zenoVoiceReplies");
     voiceRepliesEnabled = voiceRepliesEnabled === null ? true : voiceRepliesEnabled === "true";
 
@@ -40,6 +45,74 @@ document.addEventListener("DOMContentLoaded", () => {
 
     function shouldPlayVoiceReply(data) {
         return voiceRepliesEnabled && data && data.audio_url;
+    }
+
+    function setAgentStatus(text, kind = "neutral") {
+        if (!agentStatus) return;
+        const clean = (text || "").trim();
+        if (!clean) {
+            agentStatus.classList.add("hidden");
+            agentStatus.textContent = "";
+            agentStatus.dataset.kind = "";
+            return;
+        }
+        agentStatus.textContent = clean;
+        agentStatus.dataset.kind = kind;
+        agentStatus.classList.remove("hidden");
+    }
+
+    function clearAgentStatus() {
+        setAgentStatus("");
+    }
+
+    function setSpeakingState(isSpeaking) {
+        isBotSpeaking = isSpeaking;
+        if (stopSpeakingBtn) {
+            stopSpeakingBtn.classList.toggle("hidden", !isSpeaking);
+        }
+    }
+
+    function stopAssistantAudio() {
+        if (!audioPlayer) return;
+        audioQueue = [];
+        isAudioPlaying = false;
+        audioPlayer.pause();
+        audioPlayer.removeAttribute("src");
+        audioPlayer.load();
+        setSpeakingState(false);
+    }
+
+    function playNextQueuedAudio() {
+        if (!audioPlayer) return;
+        if (!audioQueue.length) {
+            isAudioPlaying = false;
+            setSpeakingState(false);
+            return;
+        }
+
+        const nextUrl = audioQueue.shift();
+        if (!nextUrl) {
+            playNextQueuedAudio();
+            return;
+        }
+
+        isAudioPlaying = true;
+        setSpeakingState(true);
+        audioPlayer.src = nextUrl;
+        audioPlayer.currentTime = 0;
+        audioPlayer.play().catch(() => {
+            isAudioPlaying = false;
+            setSpeakingState(audioQueue.length > 0);
+            console.log("Audio autoplay prevented");
+        });
+    }
+
+    function enqueueAssistantAudio(audioUrl) {
+        if (!audioUrl) return;
+        audioQueue.push(audioUrl);
+        if (!isAudioPlaying) {
+            playNextQueuedAudio();
+        }
     }
 
     function currentChatLabel(chat) {
@@ -211,6 +284,27 @@ document.addEventListener("DOMContentLoaded", () => {
     }
 
     updateVoiceToggleUI();
+
+    if (audioPlayer) {
+        audioPlayer.addEventListener("playing", () => setSpeakingState(true));
+        audioPlayer.addEventListener("ended", () => {
+            isAudioPlaying = false;
+            playNextQueuedAudio();
+        });
+        audioPlayer.addEventListener("error", () => {
+            isAudioPlaying = false;
+            playNextQueuedAudio();
+        });
+        audioPlayer.addEventListener("pause", () => {
+            if (audioPlayer.currentTime === 0) {
+                setSpeakingState(false);
+            }
+        });
+    }
+
+    if (stopSpeakingBtn) {
+        stopSpeakingBtn.addEventListener("click", stopAssistantAudio);
+    }
 
     // Auto-resize textarea
     messageInput.addEventListener("input", () => {
@@ -391,6 +485,7 @@ document.addEventListener("DOMContentLoaded", () => {
                     updateMessageText(assistantDraft, assistantText);
                 },
                 done: (data) => {
+                    clearAgentStatus();
                     if (!assistantDraft) {
                         loadingDiv.remove();
                         assistantDraft = appendMessage("assistant", data.response || "", data);
@@ -398,17 +493,35 @@ document.addEventListener("DOMContentLoaded", () => {
                         updateMessageText(assistantDraft, data.response || assistantText);
                     }
                     refreshChats().catch(() => {});
+                    if (data.audio_pending && voiceRepliesEnabled) {
+                        setSpeakingState(true);
+                    } else if (!data.audio_pending) {
+                        setSpeakingState(false);
+                    }
+                },
+                audio_chunk: (data) => {
                     if (shouldPlayVoiceReply(data)) {
-                        audioPlayer.src = data.audio_url;
-                        audioPlayer.play().catch(() => console.log("Audio autoplay prevented"));
+                        enqueueAssistantAudio(data.audio_url);
+                    }
+                },
+                audio_ready: (data) => {
+                    if (shouldPlayVoiceReply(data)) {
+                        enqueueAssistantAudio(data.audio_url);
+                    }
+                },
+                status: (data) => {
+                    if (data && data.message) {
+                        setAgentStatus(data.message, data.stage || "neutral");
                     }
                 },
                 error: () => {
+                    clearAgentStatus();
                     if (loadingDiv) loadingDiv.remove();
                     appendMessage("assistant", "⚠️ Error communicating with Zeno.");
                 },
             });
         } catch (err) {
+            clearAgentStatus();
             loadingDiv.remove();
             appendMessage("assistant", "⚠️ Error communicating with Zeno.");
         }
@@ -549,6 +662,7 @@ document.addEventListener("DOMContentLoaded", () => {
                     updateMessageText(assistantDraft, assistantText);
                 },
                 done: (data) => {
+                    clearAgentStatus();
                     if (!data.transcription && recordingDraftMessage) {
                         updateMessageText(recordingDraftMessage, "🎙️ _No speech detected._");
                         recordingDraftMessage = null;
@@ -569,17 +683,35 @@ document.addEventListener("DOMContentLoaded", () => {
                         updateMessageText(assistantDraft, data.response || assistantText);
                     }
                     refreshChats().catch(() => {});
+                    if (data.audio_pending && voiceRepliesEnabled) {
+                        setSpeakingState(true);
+                    } else if (!data.audio_pending) {
+                        setSpeakingState(false);
+                    }
+                },
+                audio_chunk: (data) => {
                     if (shouldPlayVoiceReply(data)) {
-                        audioPlayer.src = data.audio_url;
-                        audioPlayer.play().catch(() => console.log("Audio autoplay prevented"));
+                        enqueueAssistantAudio(data.audio_url);
+                    }
+                },
+                audio_ready: (data) => {
+                    if (shouldPlayVoiceReply(data)) {
+                        enqueueAssistantAudio(data.audio_url);
+                    }
+                },
+                status: (data) => {
+                    if (data && data.message) {
+                        setAgentStatus(data.message, data.stage || "neutral");
                     }
                 },
                 error: () => {
+                    clearAgentStatus();
                     loadingDiv.remove();
                     appendMessage("assistant", "⚠️ Error processing voice note.");
                 },
             });
         } catch (err) {
+            clearAgentStatus();
             loadingDiv.remove();
             appendMessage("assistant", "⚠️ Error processing voice note.");
         }

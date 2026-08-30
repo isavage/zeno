@@ -3,10 +3,11 @@ import os
 import uuid
 import logging
 import tempfile
+import asyncio
+import re
 from contextlib import asynccontextmanager
 from pathlib import Path
-from typing import Optional, Dict, Any
-from typing import List, Optional, Dict, Any
+from typing import Optional, Dict, Any, List, Tuple
 
 from fastapi import FastAPI, Request, Form, UploadFile, File, HTTPException, status, Depends, APIRouter
 from fastapi.responses import HTMLResponse, RedirectResponse, JSONResponse, FileResponse, StreamingResponse
@@ -116,6 +117,42 @@ def build_redirect_uri(request: Request, path: str) -> str:
 
 def sse_frame(event: str, payload: Dict[str, Any]) -> str:
     return f"event: {event}\ndata: {json.dumps(payload, ensure_ascii=False)}\n\n"
+
+
+def extract_speech_chunks(buffer: str, final: bool = False) -> Tuple[List[str], str]:
+    """Split assistant text into TTS-friendly chunks."""
+    text = buffer.strip()
+    if not text:
+        return [], ""
+
+    chunks: List[str] = []
+
+    while True:
+        match = re.match(r"^(.+?[.!?]+(?:['\"])?)(?:\s+|$)", text)
+        if not match:
+            break
+        chunk = match.group(1).strip()
+        if chunk:
+            chunks.append(chunk)
+        text = text[match.end():].lstrip()
+        if not text:
+            return chunks, ""
+
+    if final:
+        if text:
+            chunks.append(text)
+        return chunks, ""
+
+    if len(text) >= 140:
+        cutoff = max(text.rfind(" ", 0, 160), text.rfind(",", 0, 160), text.rfind(";", 0, 160))
+        if cutoff < 60:
+            cutoff = min(len(text), 160)
+        chunk = text[:cutoff].strip()
+        if chunk:
+            chunks.append(chunk)
+        text = text[cutoff:].lstrip()
+
+    return chunks, text
 
 
 def build_chat_session_id(user_email: str, chat_id: str) -> str:
@@ -322,24 +359,73 @@ async def chat_endpoint(request: Request):
 
     async def event_stream():
         final_result: Dict[str, Any] = {}
+        speech_buffer = ""
+        pending_audio_tasks: List[Dict[str, Any]] = []
+        audio_index = 0
+
+        async def enqueue_audio_chunk(chunk_text: str):
+            nonlocal audio_index
+            if not synthesize_voice:
+                return
+            chunk_text = chunk_text.strip()
+            if not chunk_text:
+                return
+            audio_path = AUDIO_CACHE_DIR / f"{uuid.uuid4().hex}{tts_engine.output_suffix}"
+            task = asyncio.create_task(tts_engine.synthesize_to_file(chunk_text, audio_path))
+            pending_audio_tasks.append({
+                "index": audio_index,
+                "task": task,
+                "path": audio_path,
+            })
+            audio_index += 1
+
+        async def emit_ready_audio(wait_all: bool = False):
+            emitted: List[Dict[str, Any]] = []
+            while pending_audio_tasks:
+                item = pending_audio_tasks[0]
+                if not wait_all and not item["task"].done():
+                    break
+                pending_audio_tasks.pop(0)
+                try:
+                    saved_path = await item["task"]
+                    if saved_path and saved_path.exists():
+                        emitted.append({
+                            "audio_url": f"/api/audio/{saved_path.name}",
+                            "audio_pending": True,
+                            "chunk_index": item["index"],
+                        })
+                except Exception as e:
+                    logger.warning(f"Voice synthesis error: {e}")
+            return emitted
+
         try:
             async for event in zeno_agent.stream_query(session_id, message):
                 if event.get("type") == "delta":
                     yield sse_frame("delta", event)
+                    if synthesize_voice:
+                        speech_buffer += event.get("text", "")
+                        ready_chunks, speech_buffer = extract_speech_chunks(speech_buffer, final=False)
+                        for chunk_text in ready_chunks:
+                            await enqueue_audio_chunk(chunk_text)
+                        for audio_event in await emit_ready_audio(wait_all=False):
+                            yield sse_frame("audio_chunk", audio_event)
                 elif event.get("type") == "done":
                     final_result = event
-                    audio_url = None
                     if synthesize_voice:
-                        audio_path = AUDIO_CACHE_DIR / f"{uuid.uuid4().hex}{tts_engine.output_suffix}"
-                        try:
-                            saved_path = await tts_engine.synthesize_to_file(final_result.get("response", ""), audio_path)
-                            if saved_path and saved_path.exists():
-                                audio_url = f"/api/audio/{saved_path.name}"
-                        except Exception as e:
-                            logger.warning(f"Voice synthesis error: {e}")
+                        ready_chunks, speech_buffer = extract_speech_chunks(speech_buffer, final=True)
+                        for chunk_text in ready_chunks:
+                            await enqueue_audio_chunk(chunk_text)
+                        payload = dict(final_result)
+                        payload["audio_url"] = None
+                        payload["audio_pending"] = bool(pending_audio_tasks)
+                        yield sse_frame("done", payload)
+                        for audio_event in await emit_ready_audio(wait_all=True):
+                            yield sse_frame("audio_chunk", audio_event)
+                        continue
 
                     payload = dict(final_result)
-                    payload["audio_url"] = audio_url
+                    payload["audio_url"] = None
+                    payload["audio_pending"] = False
                     yield sse_frame("done", payload)
                 else:
                     yield sse_frame(event.get("type", "message"), event)
@@ -394,24 +480,74 @@ async def voice_endpoint(
 
     async def event_stream():
         yield sse_frame("transcription", {"transcription": transcription})
+        speech_buffer = ""
+        pending_audio_tasks: List[Dict[str, Any]] = []
+        audio_index = 0
+
+        async def enqueue_audio_chunk(chunk_text: str):
+            nonlocal audio_index
+            if not synthesize_voice:
+                return
+            chunk_text = chunk_text.strip()
+            if not chunk_text:
+                return
+            audio_path = AUDIO_CACHE_DIR / f"{uuid.uuid4().hex}{tts_engine.output_suffix}"
+            task = asyncio.create_task(tts_engine.synthesize_to_file(chunk_text, audio_path))
+            pending_audio_tasks.append({
+                "index": audio_index,
+                "task": task,
+                "path": audio_path,
+            })
+            audio_index += 1
+
+        async def emit_ready_audio(wait_all: bool = False):
+            emitted: List[Dict[str, Any]] = []
+            while pending_audio_tasks:
+                item = pending_audio_tasks[0]
+                if not wait_all and not item["task"].done():
+                    break
+                pending_audio_tasks.pop(0)
+                try:
+                    saved_path = await item["task"]
+                    if saved_path and saved_path.exists():
+                        emitted.append({
+                            "audio_url": f"/api/audio/{saved_path.name}",
+                            "audio_pending": True,
+                            "chunk_index": item["index"],
+                        })
+                except Exception as e:
+                    logger.warning(f"Voice synthesis error: {e}")
+            return emitted
+
         try:
             async for event in zeno_agent.stream_query(session_id, transcription):
                 if event.get("type") == "delta":
                     yield sse_frame("delta", event)
-                elif event.get("type") == "done":
-                    audio_url = None
                     if synthesize_voice:
-                        audio_path = AUDIO_CACHE_DIR / f"{uuid.uuid4().hex}{tts_engine.output_suffix}"
-                        try:
-                            saved_path = await tts_engine.synthesize_to_file(event.get("response", ""), audio_path)
-                            if saved_path and saved_path.exists():
-                                audio_url = f"/api/audio/{saved_path.name}"
-                        except Exception as e:
-                            logger.warning(f"Voice synthesis error: {e}")
+                        speech_buffer += event.get("text", "")
+                        ready_chunks, speech_buffer = extract_speech_chunks(speech_buffer, final=False)
+                        for chunk_text in ready_chunks:
+                            await enqueue_audio_chunk(chunk_text)
+                        for audio_event in await emit_ready_audio(wait_all=False):
+                            yield sse_frame("audio_chunk", audio_event)
+                elif event.get("type") == "done":
+                    if synthesize_voice:
+                        ready_chunks, speech_buffer = extract_speech_chunks(speech_buffer, final=True)
+                        for chunk_text in ready_chunks:
+                            await enqueue_audio_chunk(chunk_text)
+                        payload = dict(event)
+                        payload["transcription"] = transcription
+                        payload["audio_url"] = None
+                        payload["audio_pending"] = bool(pending_audio_tasks)
+                        yield sse_frame("done", payload)
+                        for audio_event in await emit_ready_audio(wait_all=True):
+                            yield sse_frame("audio_chunk", audio_event)
+                        continue
 
                     payload = dict(event)
                     payload["transcription"] = transcription
-                    payload["audio_url"] = audio_url
+                    payload["audio_url"] = None
+                    payload["audio_pending"] = False
                     yield sse_frame("done", payload)
                 else:
                     yield sse_frame(event.get("type", "message"), event)

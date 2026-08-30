@@ -71,6 +71,15 @@ class HermesAgent:
         chunk_size = max(6, min(18, max(1, len(words) // 6)))
         return [" ".join(words[i:i + chunk_size]) for i in range(0, len(words), chunk_size)]
 
+    def _tool_status_label(self, tool_name: str) -> str:
+        mapping = {
+            "web_search": "Searching the web",
+            "calculator": "Calculating",
+            "get_current_time": "Checking current time",
+            "notes_vault": "Checking your vault",
+        }
+        return mapping.get(tool_name, f"Using {tool_name.replace('_', ' ')}")
+
     async def process_query(
         self,
         session_id: str,
@@ -132,6 +141,13 @@ class HermesAgent:
 
                 while current_step < max_tool_steps:
                     current_step += 1
+                    yield {
+                        "type": "status",
+                        "message": f"Thinking with {target_model}",
+                        "stage": "model",
+                        "model_used": target_model,
+                        "tools_called": executed_tools,
+                    }
                     kwargs: Dict[str, Any] = {
                         "model": target_model,
                         "messages": working_messages,
@@ -156,6 +172,14 @@ class HermesAgent:
                                 fn_args = {}
 
                             logger.info(f"Agent executing tool: {fn_name} with args: {fn_args}")
+                            yield {
+                                "type": "status",
+                                "message": self._tool_status_label(fn_name),
+                                "stage": "tool",
+                                "tool_name": fn_name,
+                                "model_used": target_model,
+                                "tools_called": executed_tools,
+                            }
                             tool_result = await tool_registry.execute_tool(fn_name, fn_args)
 
                             working_messages.append({
@@ -170,6 +194,13 @@ class HermesAgent:
                     continue
 
                 stream_messages = list(working_messages)
+                yield {
+                    "type": "status",
+                    "message": f"Drafting response with {target_model}",
+                    "stage": "stream",
+                    "model_used": target_model,
+                    "tools_called": executed_tools,
+                }
                 reply_chunks: List[str] = []
                 usage_response = None
 

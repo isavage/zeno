@@ -43,6 +43,7 @@
                             <span class="voice-toggle-dot"></span>
                             <span id="voiceToggleLabel">Voice On</span>
                         </button>
+                        <button id="stopSpeakingBtn" class="header-link stop-speaking-btn hidden" type="button" title="Stop speaking">Stop Speaking</button>
                         <button id="clearChatBtn" class="icon-btn" title="Clear Chat History">
                             <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                                 <polyline points="3 6 5 6 21 6"></polyline>
@@ -60,6 +61,7 @@
                 </header>
 
                 <!-- Messages Chat Area -->
+                <div id="agentStatus" class="agent-status hidden"></div>
                 <main class="chat-messages" id="chatMessages">
                     <div class="message assistant-message">
                         <div class="message-bubble">

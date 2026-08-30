@@ -257,6 +257,27 @@ body {
     background: var(--bg-primary);
 }
 
+.agent-status {
+    margin: 10px 20px 0;
+    padding: 8px 12px;
+    align-self: flex-start;
+    max-width: calc(100% - 40px);
+    border: 1px solid rgba(88, 166, 255, 0.18);
+    border-radius: 999px;
+    background: rgba(33, 38, 45, 0.78);
+    color: var(--text-secondary);
+    font-size: 12px;
+    font-weight: 600;
+    letter-spacing: 0.01em;
+    line-height: 1.2;
+    backdrop-filter: blur(10px);
+}
+
+.agent-status strong {
+    color: var(--text-primary);
+    font-weight: 700;
+}
+
 .app-header {
     display: flex;
     align-items: center;
@@ -359,6 +380,17 @@ body {
 .voice-toggle.voice-off .voice-toggle-dot {
     background: var(--danger);
     box-shadow: 0 0 8px rgba(248, 81, 73, 0.8);
+}
+
+.stop-speaking-btn {
+    color: var(--text-primary);
+    border-color: rgba(248, 81, 73, 0.35);
+    background: rgba(248, 81, 73, 0.08);
+}
+
+.stop-speaking-btn:hover {
+    background: rgba(248, 81, 73, 0.16);
+    border-color: rgba(248, 81, 73, 0.65);
 }
 
 .icon-btn {
