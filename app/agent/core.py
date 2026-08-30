@@ -60,15 +60,12 @@ class HermesAgent:
         if not clean:
             return []
 
-        sentence_chunks = [part.strip() for part in re.split(r"(?<=[.!?])\s+", clean) if part.strip()]
-        if len(sentence_chunks) > 1:
-            return sentence_chunks
-
         words = clean.split()
         if len(words) <= 1:
             return [clean]
 
-        chunk_size = max(6, min(18, max(1, len(words) // 6)))
+        # Keep synthetic output close to the cadence of normal token streaming.
+        chunk_size = 3
         return [" ".join(words[i:i + chunk_size]) for i in range(0, len(words), chunk_size)]
 
     def _tool_status_label(self, tool_name: str) -> str:
@@ -266,7 +263,7 @@ class HermesAgent:
                             "tools_called": executed_tools,
                             "status": "streaming",
                         }
-                        await asyncio.sleep(0.01)
+                        await asyncio.sleep(0.06)
 
                 memory_store.add_message(session_id, "assistant", reply_content)
 

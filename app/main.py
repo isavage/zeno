@@ -116,7 +116,17 @@ def build_redirect_uri(request: Request, path: str) -> str:
 
 
 def sse_frame(event: str, payload: Dict[str, Any]) -> str:
-    return f"event: {event}\ndata: {json.dumps(payload, ensure_ascii=False)}\n\n"
+    # Padding prevents common reverse proxies from buffering tiny SSE frames until
+    # several events have accumulated, which otherwise defeats live rendering.
+    padding = ": " + (" " * 2048) + "\n"
+    return f"event: {event}\ndata: {json.dumps(payload, ensure_ascii=False)}\n{padding}\n"
+
+
+SSE_HEADERS = {
+    "Cache-Control": "no-cache, no-transform",
+    "Connection": "keep-alive",
+    "X-Accel-Buffering": "no",
+}
 
 
 def extract_speech_chunks(buffer: str, final: bool = False) -> Tuple[List[str], str]:
@@ -436,7 +446,7 @@ async def chat_endpoint(request: Request):
     return StreamingResponse(
         event_stream(),
         media_type="text/event-stream",
-        headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"},
+        headers=SSE_HEADERS,
     )
 
 @app.post("/api/voice")
@@ -475,7 +485,7 @@ async def voice_endpoint(
         return StreamingResponse(
             no_speech_stream(),
             media_type="text/event-stream",
-            headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"},
+            headers=SSE_HEADERS,
         )
 
     async def event_stream():
@@ -558,7 +568,7 @@ async def voice_endpoint(
     return StreamingResponse(
         event_stream(),
         media_type="text/event-stream",
-        headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"},
+        headers=SSE_HEADERS,
     )
 
 @app.get("/api/audio/{filename}")
