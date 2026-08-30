@@ -1,5 +1,7 @@
+import asyncio
 import json
 import logging
+import re
 from typing import List, Dict, Any, Optional, AsyncGenerator
 from app.config import settings
 from app.agent.usage import usage_store
@@ -51,6 +53,23 @@ class HermesAgent:
             )
         except Exception as e:
             logger.debug(f"Failed to record usage: {e}")
+
+    def _chunk_text(self, text: str) -> List[str]:
+        """Break a full reply into smaller pieces when a provider doesn't truly stream."""
+        clean = (text or "").strip()
+        if not clean:
+            return []
+
+        sentence_chunks = [part.strip() for part in re.split(r"(?<=[.!?])\s+", clean) if part.strip()]
+        if len(sentence_chunks) > 1:
+            return sentence_chunks
+
+        words = clean.split()
+        if len(words) <= 1:
+            return [clean]
+
+        chunk_size = max(6, min(18, max(1, len(words) // 6)))
+        return [" ".join(words[i:i + chunk_size]) for i in range(0, len(words), chunk_size)]
 
     async def process_query(
         self,
@@ -202,6 +221,21 @@ class HermesAgent:
                 reply_content = "".join(reply_chunks).strip()
                 if not reply_content:
                     reply_content = "I’m sorry, I couldn’t generate a response."
+                elif len(reply_chunks) <= 1:
+                    logger.info("Provider returned a single completion chunk for %s; emitting chunked reply for UI streaming.", target_model)
+                    synthetic_chunks = self._chunk_text(reply_content)
+                    reply_content = ""
+                    for idx, chunk_text in enumerate(synthetic_chunks):
+                        reply_content = f"{reply_content} {chunk_text}".strip()
+                        yield {
+                            "type": "delta",
+                            "text": chunk_text + (" " if idx < len(synthetic_chunks) - 1 else ""),
+                            "complexity": complexity,
+                            "model_used": target_model,
+                            "tools_called": executed_tools,
+                            "status": "streaming",
+                        }
+                        await asyncio.sleep(0.01)
 
                 memory_store.add_message(session_id, "assistant", reply_content)
 
