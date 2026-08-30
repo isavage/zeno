@@ -47,8 +47,6 @@ class Settings(BaseSettings):
         return [h.strip().lower() for h in self.ALLOWED_HOSTS.split(",") if h.strip()]
 
 
-
-
     @property
     def admin_emails(self) -> List[str]:
         """Return a list of lower‑cased admin emails from the env var."""
