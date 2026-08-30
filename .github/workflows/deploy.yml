@@ -55,7 +55,9 @@ jobs:
 
             if [ -d "$TARGET_DIR" ]; then
               cd "$TARGET_DIR"
-              docker compose down || true
+              if [ -f docker-compose.yml ]; then
+                docker compose down || true
+              fi
             fi
 
             sudo mkdir -p "$TARGET_DIR"
@@ -64,12 +66,18 @@ jobs:
             cd "$TARGET_DIR"
 
             if [ "$CLEANUP" = "true" ]; then
-              docker compose down -v || true
-              sudo find . -mindepth 1 -maxdepth 1  -exec rm -rf {} +
+              # The staging rsync above already replaces application files.
+              # Do not delete docker-compose.yml or the persistent vault volume.
+              docker compose down || true
+              doppler run -- docker compose build --no-cache
             fi
 
             # Inject Doppler values directly; no .env file is created on the VPS.
-            doppler run -- docker compose up -d --build --force-recreate
+            if [ "$CLEANUP" = "true" ]; then
+              doppler run -- docker compose up -d --force-recreate
+            else
+              doppler run -- docker compose up -d --build --force-recreate
+            fi
             sleep 10
             docker compose ps
             docker compose ps | grep -q "Up"
