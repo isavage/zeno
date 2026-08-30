@@ -30,9 +30,9 @@ class Settings(BaseSettings):
     MOONSHOT_API_KEY: Optional[str] = None
     OPENROUTER_API_KEY: Optional[str] = None
 
-    DEFAULT_FAST_MODEL: str = "z-ai/glm-5.2:free"
-    DEFAULT_REASONING_MODEL: str = "gpt-5.4-mini"
-    DEFAULT_FALLBACK_MODEL: str = "minimax/minimax-m3:free"
+    DEFAULT_FAST_MODEL: str = "gpt-5-nano"
+    DEFAULT_REASONING_MODEL: str = "gpt-5.6-luna"
+    DEFAULT_FALLBACK_MODEL: str = "openrouter/free"
     ALLOWED_HOSTS: str = "localhost,127.0.0.1"  # comma‑separated list of hostnames allowed by TrustedHostMiddleware
     ADMIN_EMAILS: str = Field(
         default="",

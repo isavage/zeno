@@ -44,29 +44,41 @@
         async function loadModels() {
             const resp = await fetch(modelsEndpoint);
             const data = await resp.json();
-            const models = data.available_models;
-            // Flatten into a single array of model strings
-            const all = Object.values(models).flat();
-            return all;
+            return data.available_models || {};
         }
 
-        async function populateSelect(selectId, options, selectedValue) {
+        function providerLabel(provider) {
+            return {
+                openai: "OpenAI",
+                deepseek: "DeepSeek",
+                kimi: "Moonshot",
+                openrouter: "OpenRouter",
+            }[provider] || provider;
+        }
+
+        async function populateSelect(selectId, catalog, selectedValue) {
             const select = document.getElementById(selectId);
             select.innerHTML = "";
-            for (const val of options) {
-                const opt = document.createElement('option');
-                opt.value = val;
-                opt.textContent = val;
-                if (val === selectedValue) opt.selected = true;
-                select.appendChild(opt);
+            for (const [provider, options] of Object.entries(catalog)) {
+                if (!options || !options.length) continue;
+                const group = document.createElement("optgroup");
+                group.label = providerLabel(provider);
+                for (const val of options) {
+                    const opt = document.createElement("option");
+                    opt.value = val;
+                    opt.textContent = val;
+                    if (val === selectedValue) opt.selected = true;
+                    group.appendChild(opt);
+                }
+                select.appendChild(group);
             }
         }
 
         async function init() {
-            const [allModels, defaults] = await Promise.all([loadModels(), fetch(defaultsEndpoint).then(r=>r.json())]);
-            await populateSelect('fast-model', allModels, defaults.fast_model);
-            await populateSelect('reasoning-model', allModels, defaults.reasoning_model);
-            await populateSelect('fallback-model', allModels, defaults.fallback_model);
+            const [catalog, defaults] = await Promise.all([loadModels(), fetch(defaultsEndpoint).then(r=>r.json())]);
+            await populateSelect('fast-model', catalog, defaults.fast_model);
+            await populateSelect('reasoning-model', catalog, defaults.reasoning_model);
+            await populateSelect('fallback-model', catalog, defaults.fallback_model);
         }
 
         document.getElementById('settings-form').addEventListener('submit', async (e) => {

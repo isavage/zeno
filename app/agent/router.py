@@ -26,6 +26,10 @@ class ModelRouter:
         r"^(convert|calculate|define [a-zA-Z]+)\b",
     ]
 
+    def _model_is_available(self, model_name: str) -> bool:
+        client, _, _ = provider_manager.get_client_for_model(model_name)
+        return client is not None
+
     def assess_complexity(self, messages: List[Dict[str, Any]]) -> str:
         """Determines if request is 'simple' (free tier) or 'complex' (reasoning tier)."""
         if not messages:
@@ -71,28 +75,31 @@ class ModelRouter:
 
         if complexity == "simple":
             # Prefer fast/free tier first
-            if settings.OPENROUTER_API_KEY:
+            if self._model_is_available(fast_default):
                 candidates.append(fast_default)
+            if self._model_is_available(fallback_default):
                 candidates.append(fallback_default)
             if settings.DEEPSEEK_API_KEY:
                 candidates.append("deepseek-chat")
             if settings.OPENAI_API_KEY:
-                candidates.append("gpt-4o-mini")
+                candidates.append("gpt-5-nano")
+            if self._model_is_available("openrouter/free"):
+                candidates.append("openrouter/free")
         else:
             # Prefer deep reasoning tier
-            if settings.DEEPSEEK_API_KEY:
+            if self._model_is_available(reasoning_default):
                 candidates.append(reasoning_default)
             if settings.OPENAI_API_KEY:
-                candidates.append("gpt-4o")
+                candidates.append("gpt-5.6-luna")
             if settings.MOONSHOT_API_KEY:
                 candidates.append("moonshot-v1-32k")
-            if settings.OPENROUTER_API_KEY:
-                candidates.append("nousresearch/hermes-3-llama-3.1-405b")
-                candidates.append(fast_default)
+            if self._model_is_available("openrouter/free"):
+                candidates.append("openrouter/free")
+            if self._model_is_available(fallback_default):
                 candidates.append(fallback_default)
 
         # Ensure fallback model is always in list
-        if fallback_default not in candidates:
+        if fallback_default not in candidates and self._model_is_available(fallback_default):
             candidates.append(fallback_default)
 
         return candidates

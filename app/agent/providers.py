@@ -71,6 +71,39 @@ class LLMProviderManager:
             return self._clients[first_key], first_key, model_name
 
         return None, "", model_name
+
+    async def list_available_models(self) -> Dict[str, List[str]]:
+        """Return live model IDs for configured providers."""
+        catalog: Dict[str, List[str]] = {}
+
+        async def _fetch_models(provider_key: str, client: AsyncOpenAI) -> List[str]:
+            try:
+                response = await client.models.list()
+                models = getattr(response, "data", []) or []
+                model_ids = []
+                for model in models:
+                    model_id = getattr(model, "id", None)
+                    if isinstance(model_id, str) and model_id.strip():
+                        model_ids.append(model_id.strip())
+                return sorted(dict.fromkeys(model_ids))
+            except Exception as exc:
+                logger.warning("Failed to fetch models for %s: %s", provider_key, exc)
+                return []
+
+        for provider_key in ("openai", "deepseek", "kimi", "openrouter"):
+            client = self._clients.get(provider_key)
+            if not client:
+                continue
+            if provider_key == "openrouter":
+                catalog[provider_key] = ["openrouter/free"]
+                continue
+            catalog[provider_key] = await _fetch_models(provider_key, client)
+
+        if "openrouter" in self._clients and "openrouter/free" not in catalog.get("openrouter", []):
+            catalog.setdefault("openrouter", []).insert(0, "openrouter/free")
+
+        return catalog
+
     def has_any_provider(self) -> bool:
         return len(self._clients) > 0
 

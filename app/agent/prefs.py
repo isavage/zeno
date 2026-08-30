@@ -36,6 +36,7 @@ def _load_from_disk() -> Dict[str, str]:
         value = data.get(key)
         if isinstance(value, str) and value.strip():
             prefs[key] = value.strip()
+
     return prefs
 
 

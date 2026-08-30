@@ -21,6 +21,7 @@ from app.security.auth import oauth, is_email_authorized, get_current_user, get_
 from app.agent.usage import usage_store
 from app.agent.core import zeno_agent
 from app.agent.memory import memory_store
+from app.agent.providers import provider_manager
 from app.voice.stt import stt_engine
 from app.voice import tts_engine
 from app.channels.telegram_bot import telegram_manager
@@ -134,28 +135,16 @@ async def admin_home(request: Request, user: Dict[str, Any] = Depends(get_curren
 
 
 @admin_router.get("/models")
-def list_models(_: Dict[str, Any] = Depends(get_current_admin_user)):
-    """Return a dict of provider -> list of model identifiers.
-    This is a static list; extend as needed.
-    """
-    return {
-        "available_models": {
-            "openrouter": [
-                "nousresearch/hermes-3-llama-3.1-8b",
-                "meta-llama/llama-3.3-70b-instruct:free",
-            ],
-            "openai": ["gpt-4o", "gpt-4o-mini"],
-            "deepseek": ["deepseek-chat"],
-            "kimi": ["moonshot-v1-32k"],
-        }
-    }
+async def list_models(_: Dict[str, Any] = Depends(get_current_admin_user)):
+    """Return live model IDs for the configured providers."""
+    return {"available_models": await provider_manager.list_available_models()}
 
 @admin_router.get("/defaults")
 def get_defaults(_: Dict[str, Any] = Depends(get_current_admin_user)):
     return prefs.get_prefs()
 
 @admin_router.post("/defaults")
-def set_defaults(
+async def set_defaults(
     fast_model: str,
     reasoning_model: str,
     fallback_model: str,
@@ -163,7 +152,8 @@ def set_defaults(
 ):
     # Basic validation against known models
     known = set()
-    for prov_models in list_models()["available_models"].values():
+    model_catalog = await provider_manager.list_available_models()
+    for prov_models in model_catalog.values():
         known.update(prov_models)
     for m in (fast_model, reasoning_model, fallback_model):
         if m not in known:
