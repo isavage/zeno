@@ -65,7 +65,7 @@ jobs:
 
             if [ "$CLEANUP" = "true" ]; then
               docker compose down -v || true
-              sudo find . -mindepth 1 -maxdepth 1 ! -name '.env' -exec rm -rf {} +
+              sudo find . -mindepth 1 -maxdepth 1  -exec rm -rf {} +
             fi
 
             # Inject Doppler values directly; no .env file is created on the VPS.
