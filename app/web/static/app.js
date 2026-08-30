@@ -28,6 +28,7 @@ document.addEventListener("DOMContentLoaded", () => {
     let isBotSpeaking = false;
     let audioQueue = [];
     let isAudioPlaying = false;
+    const VOICE_PLAYBACK_RATE = 1.2;
     let voiceRepliesEnabled = localStorage.getItem("zenoVoiceReplies");
     voiceRepliesEnabled = voiceRepliesEnabled === null ? true : voiceRepliesEnabled === "true";
 
@@ -99,6 +100,7 @@ document.addEventListener("DOMContentLoaded", () => {
         isAudioPlaying = true;
         setSpeakingState(true);
         audioPlayer.src = nextUrl;
+        audioPlayer.playbackRate = VOICE_PLAYBACK_RATE;
         audioPlayer.currentTime = 0;
         audioPlayer.play().catch(() => {
             isAudioPlaying = false;

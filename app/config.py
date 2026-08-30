@@ -58,6 +58,13 @@ class Settings(BaseSettings):
     TELEGRAM_ALLOWED_USER_IDS: str = ""
     ENABLE_TELEGRAM_VOICE_REPLIES: bool = True
 
+    # Host-level Docker access is opt-in and limited to the configured containers.
+    ENABLE_DOCKER_TOOL: bool = False
+    DOCKER_ALLOWED_CONTAINERS: str = "zeno"
+    DOCKER_COMMAND_TIMEOUT_SECONDS: int = 20
+    ENABLE_TERMINAL_TOOL: bool = False
+    TERMINAL_COMMAND_TIMEOUT_SECONDS: int = 20
+
     # Web UI Auth
     AUTHORIZED_EMAILS: str = ""
 
@@ -78,7 +85,7 @@ class Settings(BaseSettings):
     # Primary TTS provider: "edge" uses free edge‑tts wrapper, "kokoro" forces Kokoro only
     TTS_PROVIDER: str = "edge"
     # Edge TTS voice selection (default female)
-    EDGE_TTS_VOICE: str = "en-US-AriaNeural"
+    EDGE_TTS_VOICE: str = "en-US-EmmaNeural"
 
     @property
     def allowed_telegram_ids(self) -> List[int]:
@@ -96,6 +103,12 @@ class Settings(BaseSettings):
         if not self.AUTHORIZED_EMAILS:
             return []
         return [e.strip().lower() for e in self.AUTHORIZED_EMAILS.split(",") if e.strip()]
+
+    @property
+    def docker_allowed_containers(self) -> List[str]:
+        if not self.DOCKER_ALLOWED_CONTAINERS:
+            return []
+        return [c.strip() for c in self.DOCKER_ALLOWED_CONTAINERS.split(",") if c.strip()]
 
     @property
     def vault_path(self) -> Path:

@@ -30,8 +30,15 @@ services:
       - MICROSOFT_CLIENT_ID=${MICROSOFT_CLIENT_ID}
       - MICROSOFT_CLIENT_SECRET=${MICROSOFT_CLIENT_SECRET}
       - MICROSOFT_TENANT_ID=${MICROSOFT_TENANT_ID:-common}
+      - ENABLE_DOCKER_TOOL=${ENABLE_DOCKER_TOOL:-false}
+      - DOCKER_ALLOWED_CONTAINERS=${DOCKER_ALLOWED_CONTAINERS:-zeno}
+      - DOCKER_COMMAND_TIMEOUT_SECONDS=${DOCKER_COMMAND_TIMEOUT_SECONDS:-20}
+      - ENABLE_TERMINAL_TOOL=${ENABLE_TERMINAL_TOOL:-false}
+      - TERMINAL_COMMAND_TIMEOUT_SECONDS=${TERMINAL_COMMAND_TIMEOUT_SECONDS:-20}
     volumes:
       - zeno_vault:/data/vault
+      # Required only when ENABLE_DOCKER_TOOL=true; this grants host-level Docker access.
+      - /var/run/docker.sock:/var/run/docker.sock
 
 
 volumes:

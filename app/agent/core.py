@@ -122,7 +122,7 @@ class HermesAgent:
 
         complexity = model_router.assess_complexity(messages)
         candidate_models = model_router.get_candidate_models(complexity)
-        tools = tool_registry.get_openai_schemas()
+        tools = tool_registry.get_openai_schemas(session_id)
 
         last_error = None
         executed_tools: List[str] = []
@@ -177,7 +177,7 @@ class HermesAgent:
                                 "model_used": target_model,
                                 "tools_called": executed_tools,
                             }
-                            tool_result = await tool_registry.execute_tool(fn_name, fn_args)
+                            tool_result = await tool_registry.execute_tool(fn_name, fn_args, session_id)
 
                             working_messages.append({
                                 "role": "tool",
