@@ -21,18 +21,23 @@ from app.voice import tts_engine
 
 logger = logging.getLogger(__name__)
 
-def is_user_authorized(user_id: int) -> bool:
-    """Verifies that the user ID is in the allowed whitelist."""
-    allowed = settings.allowed_telegram_ids
+def is_user_authorized(user_id: int, username: Optional[str] = None) -> bool:
+    """Verify a Telegram numeric ID or username against the whitelist."""
+    if not settings.TELEGRAM_ALLOWED_USER_IDS:
+        logger.warning("No TELEGRAM_ALLOWED_USER_IDS configured. Denying user %s", user_id)
+        return False
+    allowed = settings.telegram_allowed_users
+    identities = {str(user_id).lower()}
+    if username:
+        identities.add(username.strip().lstrip("@").lower())
     if not allowed:
-        # If not set, log warning and allow for initial setup
-        logger.warning("No TELEGRAM_ALLOWED_USER_IDS configured. Allowing user %s", user_id)
-        return True
-    return user_id in allowed
+        logger.error("TELEGRAM_ALLOWED_USER_IDS contains no valid identities; denying user %s", user_id)
+        return False
+    return bool(identities.intersection(allowed))
 
 async def start_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user = update.effective_user
-    if not is_user_authorized(user.id):
+    if not is_user_authorized(user.id, user.username):
         await update.message.reply_text("⛔ Unauthorized. Your Telegram ID is not registered in Zeno.")
         return
 
@@ -47,7 +52,7 @@ async def start_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 async def clear_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user = update.effective_user
-    if not is_user_authorized(user.id):
+    if not is_user_authorized(user.id, user.username):
         return
 
     session_id = f"tg_{user.id}"
@@ -56,7 +61,7 @@ async def clear_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 async def handle_text_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user = update.effective_user
-    if not is_user_authorized(user.id):
+    if not is_user_authorized(user.id, user.username):
         return
 
     user_text = update.message.text
@@ -65,7 +70,7 @@ async def handle_text_message(update: Update, context: ContextTypes.DEFAULT_TYPE
     # Send typing action
     await update.message.chat.send_action("typing")
 
-    result = await zeno_agent.process_query(session_id, user_text)
+    result = await zeno_agent.process_query(session_id, user_text, telegram_username=user.username or "")
     reply_text = result.get("response", "")
 
     # Send text response
@@ -108,7 +113,7 @@ async def handle_voice_message(update: Update, context: ContextTypes.DEFAULT_TYP
 
     # Process query
     await update.message.chat.send_action("typing")
-    result = await zeno_agent.process_query(session_id, transcription)
+    result = await zeno_agent.process_query(session_id, transcription, telegram_username=user.username or "")
     reply_text = result.get("response", "")
 
     # Attempt voice reply if enabled

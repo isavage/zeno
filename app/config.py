@@ -100,6 +100,15 @@ class Settings(BaseSettings):
         return ids
 
     @property
+    def telegram_allowed_users(self) -> List[str]:
+        """Return configured Telegram IDs or usernames in normalized form."""
+        return [
+            value.strip().lstrip("@").lower()
+            for value in self.TELEGRAM_ALLOWED_USER_IDS.split(",")
+            if value.strip()
+        ]
+
+    @property
     def telegram_admin_user_ids(self) -> List[int]:
         if not self.TELEGRAM_ADMIN_USER_IDS:
             return []
@@ -109,6 +118,14 @@ class Settings(BaseSettings):
             if raw.isdigit():
                 ids.append(int(raw))
         return ids
+
+    @property
+    def telegram_admin_users(self) -> List[str]:
+        return [
+            value.strip().lstrip("@").lower()
+            for value in self.TELEGRAM_ADMIN_USER_IDS.split(",")
+            if value.strip()
+        ]
 
     @property
     def authorized_emails_list(self) -> List[str]:

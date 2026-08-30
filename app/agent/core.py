@@ -81,11 +81,17 @@ class HermesAgent:
         self,
         session_id: str,
         user_message: str,
-        max_tool_steps: int = 5
+        max_tool_steps: int = 5,
+        telegram_username: str = "",
     ) -> Dict[str, Any]:
         """Main processing loop for user requests."""
         final_result: Optional[Dict[str, Any]] = None
-        async for event in self.stream_query(session_id, user_message, max_tool_steps=max_tool_steps):
+        async for event in self.stream_query(
+            session_id,
+            user_message,
+            max_tool_steps=max_tool_steps,
+            telegram_username=telegram_username,
+        ):
             if event.get("type") == "done":
                 final_result = event
         if final_result:
@@ -111,6 +117,7 @@ class HermesAgent:
         session_id: str,
         user_message: str,
         max_tool_steps: int = 5,
+        telegram_username: str = "",
     ) -> AsyncGenerator[Dict[str, Any], None]:
         """Streaming version of the query loop for web clients."""
         history = memory_store.get_recent_history(session_id, limit=10)
@@ -122,7 +129,7 @@ class HermesAgent:
 
         complexity = model_router.assess_complexity(messages)
         candidate_models = model_router.get_candidate_models(complexity)
-        tools = tool_registry.get_openai_schemas(session_id)
+        tools = tool_registry.get_openai_schemas(session_id, telegram_username)
 
         last_error = None
         executed_tools: List[str] = []
@@ -177,7 +184,12 @@ class HermesAgent:
                                 "model_used": target_model,
                                 "tools_called": executed_tools,
                             }
-                            tool_result = await tool_registry.execute_tool(fn_name, fn_args, session_id)
+                            tool_result = await tool_registry.execute_tool(
+                                fn_name,
+                                fn_args,
+                                session_id,
+                                telegram_username,
+                            )
 
                             working_messages.append({
                                 "role": "tool",

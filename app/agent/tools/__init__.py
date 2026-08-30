@@ -37,30 +37,39 @@ class ToolRegistry:
         email = session_id[4:].split(":", 1)[0].strip().lower()
         return bool(email and email in settings.admin_emails)
 
-    def _admin_tool_allowed_for_session(self, session_id: str) -> bool:
+    def _admin_tool_allowed_for_session(self, session_id: str, telegram_username: str = "") -> bool:
         if session_id.startswith("web_"):
             email = session_id[4:].split(":", 1)[0].strip().lower()
             return bool(email and email in settings.admin_emails)
         if session_id.startswith("tg_"):
             raw_user_id = session_id[3:].strip()
-            return raw_user_id.isdigit() and int(raw_user_id) in settings.telegram_admin_user_ids
+            if raw_user_id.isdigit() and int(raw_user_id) in settings.telegram_admin_user_ids:
+                return True
+            username = telegram_username.strip().lstrip("@").lower()
+            return bool(username and username in settings.telegram_admin_users)
         return False
 
-    def get_openai_schemas(self, session_id: str = "") -> List[Dict[str, Any]]:
+    def get_openai_schemas(self, session_id: str = "", telegram_username: str = "") -> List[Dict[str, Any]]:
         return [
             tool.to_openai_tool()
             for tool in self._tools.values()
             if tool.name not in {"docker", "terminal"}
-            or self._admin_tool_allowed_for_session(session_id)
+            or self._admin_tool_allowed_for_session(session_id, telegram_username)
         ]
 
-    async def execute_tool(self, name: str, arguments: Dict[str, Any], session_id: str = "") -> Any:
+    async def execute_tool(
+        self,
+        name: str,
+        arguments: Dict[str, Any],
+        session_id: str = "",
+        telegram_username: str = "",
+    ) -> Any:
         tool = self.get_tool(name)
         if not tool:
             return {"error": f"Tool '{name}' not found."}
         if name == "docker" and not self._docker_allowed_for_session(session_id):
             return {"error": "Docker control is restricted to admin users."}
-        if name == "terminal" and not self._admin_tool_allowed_for_session(session_id):
+        if name == "terminal" and not self._admin_tool_allowed_for_session(session_id, telegram_username):
             return {"error": "Terminal access is restricted to admin users."}
         return await tool.execute(**arguments)
 

@@ -37,9 +37,9 @@ def is_email_authorized(email: Optional[str]) -> bool:
         return False
     authorized = settings.authorized_emails_list
     if not authorized:
-        # If no whitelist is specified, log warning and allow for first-time onboarding
-        logger.warning("No AUTHORIZED_EMAILS configured in environment. Allowing authenticated session.")
-        return True
+        # Authentication alone is never sufficient; the whitelist is mandatory.
+        logger.warning("No AUTHORIZED_EMAILS configured in environment. Denying email %s.", email)
+        return False
     return email.strip().lower() in authorized
 
 
