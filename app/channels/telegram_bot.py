@@ -33,7 +33,14 @@ def is_user_authorized(user_id: int, username: Optional[str] = None) -> bool:
     if not allowed:
         logger.error("TELEGRAM_ALLOWED_USER_IDS contains no valid identities; denying user %s", user_id)
         return False
-    return bool(identities.intersection(allowed))
+    authorized = bool(identities.intersection(allowed))
+    logger.info(
+        "Telegram authorization user_id=%s username=%s result=%s",
+        user_id,
+        username or "<none>",
+        authorized,
+    )
+    return authorized
 
 async def start_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user = update.effective_user
@@ -61,7 +68,9 @@ async def clear_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 async def handle_text_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user = update.effective_user
+    logger.info("Received Telegram text message user_id=%s username=%s", user.id, user.username or "<none>")
     if not is_user_authorized(user.id, user.username):
+        logger.warning("Rejected Telegram text message user_id=%s", user.id)
         return
 
     user_text = update.message.text
@@ -82,7 +91,9 @@ async def handle_text_message(update: Update, context: ContextTypes.DEFAULT_TYPE
 
 async def handle_voice_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user = update.effective_user
-    if not is_user_authorized(user.id):
+    logger.info("Received Telegram voice message user_id=%s username=%s", user.id, user.username or "<none>")
+    if not is_user_authorized(user.id, user.username):
+        logger.warning("Rejected Telegram voice message user_id=%s", user.id)
         return
 
     session_id = f"tg_{user.id}"
