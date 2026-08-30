@@ -116,6 +116,10 @@ def build_redirect_uri(request: Request, path: str) -> str:
 def sse_frame(event: str, payload: Dict[str, Any]) -> str:
     return f"event: {event}\ndata: {json.dumps(payload, ensure_ascii=False)}\n\n"
 
+
+def build_chat_session_id(user_email: str, chat_id: str) -> str:
+    return f"web_{user_email}" if chat_id == "default" else f"web_{user_email}:{chat_id}"
+
 @admin_router.get("")
 @admin_router.get("/")
 async def admin_home(request: Request, user: Dict[str, Any] = Depends(get_current_admin_user)):
@@ -283,6 +287,37 @@ async def dev_login(request: Request, email: str = Form(...)):
 
 # ----------------- Agent REST APIs -----------------
 
+@app.get("/api/chats")
+async def list_chats(request: Request):
+    user = await get_current_user(request)
+    return {"chats": memory_store.list_conversations(user["email"])}
+
+
+@app.post("/api/chats")
+async def create_chat(request: Request):
+    user = await get_current_user(request)
+    body = await request.json()
+    title = (body.get("title") or "").strip() or None
+    chat_id = uuid.uuid4().hex[:12]
+    chat = memory_store.create_conversation(user["email"], chat_id, title)
+    return {"chat": chat}
+
+
+@app.get("/api/chats/{chat_id}/history")
+async def get_chat_history(chat_id: str, request: Request):
+    user = await get_current_user(request)
+    session_id = build_chat_session_id(user["email"], chat_id)
+    return {"chat_id": chat_id, "messages": memory_store.get_recent_history(session_id, limit=100)}
+
+
+@app.post("/api/chats/{chat_id}/clear")
+async def clear_chat(chat_id: str, request: Request):
+    user = await get_current_user(request)
+    session_id = build_chat_session_id(user["email"], chat_id)
+    memory_store.clear_history(session_id)
+    return {"status": "success", "message": "History cleared"}
+
+
 @app.post("/api/chat")
 async def chat_endpoint(request: Request):
     user = await get_current_user(request)
@@ -291,7 +326,8 @@ async def chat_endpoint(request: Request):
     if not message:
         raise HTTPException(status_code=400, detail="Empty message")
 
-    session_id = f"web_{user['email']}"
+    chat_id = (body.get("chat_id") or "default").strip() or "default"
+    session_id = build_chat_session_id(user["email"], chat_id)
     synthesize_voice = bool(body.get("synthesize_voice", False))
 
     async def event_stream():
@@ -306,7 +342,7 @@ async def chat_endpoint(request: Request):
                     if synthesize_voice:
                         audio_path = AUDIO_CACHE_DIR / f"{uuid.uuid4().hex}{tts_engine.output_suffix}"
                         try:
-                            saved_path = tts_engine.synthesize_to_file(final_result.get("response", ""), audio_path)
+                            saved_path = await tts_engine.synthesize_to_file(final_result.get("response", ""), audio_path)
                             if saved_path and saved_path.exists():
                                 audio_url = f"/api/audio/{saved_path.name}"
                         except Exception as e:
@@ -332,9 +368,11 @@ async def voice_endpoint(
     request: Request,
     file: UploadFile = File(...),
     synthesize_voice: bool = Form(True),
+    chat_id: str = Form("default"),
 ):
     user = await get_current_user(request)
-    session_id = f"web_{user['email']}"
+    chat_id = (chat_id or "default").strip() or "default"
+    session_id = build_chat_session_id(user["email"], chat_id)
 
     audio_bytes = await file.read()
     if not audio_bytes:
@@ -375,7 +413,7 @@ async def voice_endpoint(
                     if synthesize_voice:
                         audio_path = AUDIO_CACHE_DIR / f"{uuid.uuid4().hex}{tts_engine.output_suffix}"
                         try:
-                            saved_path = tts_engine.synthesize_to_file(event.get("response", ""), audio_path)
+                            saved_path = await tts_engine.synthesize_to_file(event.get("response", ""), audio_path)
                             if saved_path and saved_path.exists():
                                 audio_url = f"/api/audio/{saved_path.name}"
                         except Exception as e:
@@ -410,6 +448,6 @@ async def get_audio_file(filename: str):
 @app.post("/api/clear")
 async def clear_session_endpoint(request: Request):
     user = await get_current_user(request)
-    session_id = f"web_{user['email']}"
+    session_id = build_chat_session_id(user["email"], "default")
     memory_store.clear_history(session_id)
     return {"status": "success", "message": "History cleared"}

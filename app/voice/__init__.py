@@ -1,3 +1,4 @@
+import asyncio
 from typing import Optional
 from pathlib import Path
 import logging
@@ -35,15 +36,15 @@ class TTSEngine:
         msg = str(exc).lower()
         return "rate limit" in msg or "429" in msg
 
-    def synthesize_to_file(self, text: str, out_path: Path) -> Optional[Path]:
+    async def synthesize_to_file(self, text: str, out_path: Path) -> Optional[Path]:
         try:
-            return self.primary.synthesize_to_file(text, out_path)
+            return await asyncio.to_thread(self.primary.synthesize_to_file, text, out_path)
         except Exception as e:
             if self._is_rate_limit_error(e):
                 logger.warning(f"Edge TTS rate‑limit encountered ({e}); falling back to Kokoro.")
                 try:
                     fallback_path = out_path.with_suffix(".wav")
-                    return self.fallback.synthesize_to_file(text, fallback_path)
+                    return await asyncio.to_thread(self.fallback.synthesize_to_file, text, fallback_path)
                 except Exception as e2:
                     logger.error(f"Fallback TTS also failed: {e2}")
                     return None

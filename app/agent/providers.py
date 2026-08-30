@@ -37,7 +37,8 @@ class LLMProviderManager:
         if settings.OPENROUTER_API_KEY:
             self._clients["openrouter"] = AsyncOpenAI(
                 api_key=settings.OPENROUTER_API_KEY,
-                base_url="https://openrouter.ai/api/v1"
+                base_url="https://openrouter.ai/api/v1",
+                max_retries=0,
             )
 
     def get_client_for_model(self, model_name: str) -> Tuple[Optional[AsyncOpenAI], str, str]:

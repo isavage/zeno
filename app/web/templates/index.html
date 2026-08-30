@@ -13,79 +13,94 @@
 </head>
 <body class="app-body">
     <div class="app-container">
-        <!-- Top Navigation Header -->
-        <header class="app-header">
-            <div class="brand">
-                <div class="brand-avatar">⚡</div>
-                <div class="brand-info">
-                    <h2>Zeno</h2>
-                    <span class="status-badge"><span class="status-dot"></span> Online</span>
+        <div class="app-workspace">
+            <aside class="chat-sidebar">
+                <div class="sidebar-header">
+                    <div>
+                        <div class="sidebar-kicker">Conversations</div>
+                        <h3>Chats</h3>
+                    </div>
+                    <button id="newChatBtn" class="sidebar-new-btn" type="button">New</button>
                 </div>
-            </div>
-            <div class="header-actions">
-                {% if admin_user %}
-                <a href="/admin" class="header-link admin-link">Admin</a>
-                {% endif %}
-                <button id="voiceToggleBtn" class="header-link voice-toggle" type="button" title="Toggle voice replies">
-                    <span class="voice-toggle-dot"></span>
-                    <span id="voiceToggleLabel">Voice On</span>
-                </button>
-                <button id="clearChatBtn" class="icon-btn" title="Clear Chat History">
-                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                        <polyline points="3 6 5 6 21 6"></polyline>
-                        <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
-                    </svg>
-                </button>
-                <a href="/auth/logout" class="icon-btn" title="Sign Out">
-                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                        <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"></path>
-                        <polyline points="16 17 21 12 16 7"></polyline>
-                        <line x1="21" y1="12" x2="9" y2="12"></line>
-                    </svg>
-                </a>
-            </div>
-        </header>
+                <div id="chatList" class="chat-list"></div>
+            </aside>
 
-        <!-- Messages Chat Area -->
-        <main class="chat-messages" id="chatMessages">
-            <div class="message assistant-message">
-                <div class="message-bubble">
-                    <p>👋 Hello! I am <strong>Zeno</strong>, your private personal AI assistant. How can I help you today?</p>
+            <div class="chat-panel">
+                <!-- Top Navigation Header -->
+                <header class="app-header">
+                    <div class="brand">
+                        <div class="brand-avatar">⚡</div>
+                        <div class="brand-info">
+                            <h2>Zeno</h2>
+                            <span class="status-badge"><span class="status-dot"></span> Online</span>
+                        </div>
+                    </div>
+                    <div class="header-actions">
+                        {% if admin_user %}
+                        <a href="/admin" class="header-link admin-link">Admin</a>
+                        {% endif %}
+                        <button id="voiceToggleBtn" class="header-link voice-toggle" type="button" title="Toggle voice replies">
+                            <span class="voice-toggle-dot"></span>
+                            <span id="voiceToggleLabel">Voice On</span>
+                        </button>
+                        <button id="clearChatBtn" class="icon-btn" title="Clear Chat History">
+                            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <polyline points="3 6 5 6 21 6"></polyline>
+                                <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
+                            </svg>
+                        </button>
+                        <a href="/auth/logout" class="icon-btn" title="Sign Out">
+                            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"></path>
+                                <polyline points="16 17 21 12 16 7"></polyline>
+                                <line x1="21" y1="12" x2="9" y2="12"></line>
+                            </svg>
+                        </a>
+                    </div>
+                </header>
+
+                <!-- Messages Chat Area -->
+                <main class="chat-messages" id="chatMessages">
+                    <div class="message assistant-message">
+                        <div class="message-bubble">
+                            <p>👋 Hello! I am <strong>Zeno</strong>, your private personal AI assistant. How can I help you today?</p>
+                        </div>
+                    </div>
+                </main>
+
+                <!-- Live Audio Wave / Status bar for Voice Mode -->
+                <div id="voiceStatus" class="voice-status-bar hidden">
+                    <div class="pulse-wave">
+                        <span></span><span></span><span></span><span></span><span></span>
+                    </div>
+                    <div class="voice-status-copy">
+                        <span id="voiceStatusText">Listening... Release to send</span>
+                        <span id="voiceTranscript" class="voice-transcript hidden"></span>
+                    </div>
                 </div>
-            </div>
-        </main>
 
-        <!-- Live Audio Wave / Status bar for Voice Mode -->
-        <div id="voiceStatus" class="voice-status-bar hidden">
-            <div class="pulse-wave">
-                <span></span><span></span><span></span><span></span><span></span>
-            </div>
-            <div class="voice-status-copy">
-                <span id="voiceStatusText">Listening... Release to send</span>
-                <span id="voiceTranscript" class="voice-transcript hidden"></span>
+                <!-- Chat & Voice Input Footer -->
+                <footer class="input-container">
+                    <form id="chatForm" class="chat-form">
+                        <button type="button" id="micBtn" class="mic-button" title="Hold/Click to Speak">
+                            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"></path>
+                                <path d="M19 10v2a7 7 0 0 1-14 0v-2"></path>
+                                <line x1="12" y1="19" x2="12" y2="23"></line>
+                                <line x1="8" y1="23" x2="16" y2="23"></line>
+                            </svg>
+                        </button>
+                        <textarea id="messageInput" placeholder="Message Zeno..." rows="1"></textarea>
+                        <button type="submit" id="sendBtn" class="send-button" title="Send">
+                            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <line x1="22" y1="2" x2="11" y2="13"></line>
+                                <polygon points="22 2 15 22 11 13 2 9 22 2"></polygon>
+                            </svg>
+                        </button>
+                    </form>
+                </footer>
             </div>
         </div>
-
-        <!-- Chat & Voice Input Footer -->
-        <footer class="input-container">
-            <form id="chatForm" class="chat-form">
-                <button type="button" id="micBtn" class="mic-button" title="Hold/Click to Speak">
-                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                        <path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"></path>
-                        <path d="M19 10v2a7 7 0 0 1-14 0v-2"></path>
-                        <line x1="12" y1="19" x2="12" y2="23"></line>
-                        <line x1="8" y1="23" x2="16" y2="23"></line>
-                    </svg>
-                </button>
-                <textarea id="messageInput" placeholder="Message Zeno..." rows="1"></textarea>
-                <button type="submit" id="sendBtn" class="send-button" title="Send">
-                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                        <line x1="22" y1="2" x2="11" y2="13"></line>
-                        <polygon points="22 2 15 22 11 13 2 9 22 2"></polygon>
-                    </svg>
-                </button>
-            </form>
-        </footer>
     </div>
 
     <!-- Hidden audio element for auto-playing speech -->

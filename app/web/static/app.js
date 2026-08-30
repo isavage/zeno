@@ -5,10 +5,12 @@ document.addEventListener("DOMContentLoaded", () => {
     const micBtn = document.getElementById("micBtn");
     const voiceStatus = document.getElementById("voiceStatus");
     const clearChatBtn = document.getElementById("clearChatBtn");
+    const newChatBtn = document.getElementById("newChatBtn");
     const audioPlayer = document.getElementById("audioPlayer");
     const voiceToggleBtn = document.getElementById("voiceToggleBtn");
     const voiceToggleLabel = document.getElementById("voiceToggleLabel");
     const voiceTranscript = document.getElementById("voiceTranscript");
+    const chatList = document.getElementById("chatList");
 
     let mediaRecorder = null;
     let mediaStream = null;
@@ -19,6 +21,8 @@ document.addEventListener("DOMContentLoaded", () => {
     let isRecording = false;
     let speechRecognition = null;
     let recordingDraftMessage = null;
+    let activeChatId = localStorage.getItem("zenoActiveChatId") || "default";
+    let chatCache = [];
     let voiceRepliesEnabled = localStorage.getItem("zenoVoiceReplies");
     voiceRepliesEnabled = voiceRepliesEnabled === null ? true : voiceRepliesEnabled === "true";
 
@@ -36,6 +40,110 @@ document.addEventListener("DOMContentLoaded", () => {
 
     function shouldPlayVoiceReply(data) {
         return voiceRepliesEnabled && data && data.audio_url;
+    }
+
+    function currentChatLabel(chat) {
+        if (!chat) return "Default Chat";
+        return chat.title || (chat.is_default ? "Default Chat" : "New Chat");
+    }
+
+    function renderChatList(chats) {
+        if (!chatList) return;
+        chatList.innerHTML = "";
+
+        if (!chats.length) {
+            const empty = document.createElement("div");
+            empty.className = "chat-list-empty";
+            empty.textContent = "No chats yet";
+            chatList.appendChild(empty);
+            return;
+        }
+
+        for (const chat of chats) {
+            const item = document.createElement("button");
+            item.type = "button";
+            item.className = "chat-list-item";
+            if (chat.chat_id === activeChatId) {
+                item.classList.add("active");
+            }
+            item.dataset.chatId = chat.chat_id;
+            item.innerHTML = `
+                <span class="chat-list-title">${currentChatLabel(chat)}</span>
+                <span class="chat-list-meta">${chat.is_default ? "Default" : "Chat"}</span>
+            `;
+            item.addEventListener("click", () => selectChat(chat.chat_id));
+            chatList.appendChild(item);
+        }
+    }
+
+    async function fetchChats() {
+        const resp = await fetch("/api/chats");
+        if (!resp.ok) {
+            throw new Error("Failed to load chats");
+        }
+        const data = await resp.json();
+        chatCache = data.chats || [];
+        return chatCache;
+    }
+
+    function renderMessages(messages) {
+        chatMessages.innerHTML = "";
+        if (!messages.length) {
+            chatMessages.innerHTML = `
+                <div class="message assistant-message">
+                    <div class="message-bubble">
+                        <p>👋 Hello! I am <strong>Zeno</strong>, your private personal AI assistant. How can I help you today?</p>
+                    </div>
+                </div>
+            `;
+            return;
+        }
+
+        for (const message of messages) {
+            appendMessage(message.role, message.content, message);
+        }
+    }
+
+    async function loadChatHistory(chatId) {
+        const resp = await fetch(`/api/chats/${encodeURIComponent(chatId)}/history`);
+        if (!resp.ok) {
+            throw new Error("Failed to load chat history");
+        }
+        const data = await resp.json();
+        renderMessages(data.messages || []);
+    }
+
+    async function refreshChats() {
+        const chats = await fetchChats();
+        if (!chats.some((chat) => chat.chat_id === activeChatId)) {
+            activeChatId = chats[0]?.chat_id || "default";
+            localStorage.setItem("zenoActiveChatId", activeChatId);
+        }
+        renderChatList(chats);
+    }
+
+    async function selectChat(chatId) {
+        activeChatId = chatId;
+        localStorage.setItem("zenoActiveChatId", activeChatId);
+        await refreshChats();
+        await loadChatHistory(activeChatId);
+    }
+
+    async function createNewChat() {
+        const resp = await fetch("/api/chats", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ title: "New Chat" }),
+        });
+        if (!resp.ok) {
+            throw new Error("Failed to create chat");
+        }
+        const data = await resp.json();
+        const created = data.chat;
+        activeChatId = created.chat_id;
+        localStorage.setItem("zenoActiveChatId", activeChatId);
+        await refreshChats();
+        await loadChatHistory(activeChatId);
     }
 
     function updateLiveTranscript(text) {
@@ -121,16 +229,26 @@ document.addEventListener("DOMContentLoaded", () => {
     // Clear chat
     clearChatBtn.addEventListener("click", async () => {
         if (confirm("Clear conversation context?")) {
-            await fetch("/api/clear", { method: "POST" });
-            chatMessages.innerHTML = `
-                <div class="message assistant-message">
-                    <div class="message-bubble">
-                        <p>🧹 Conversation history cleared. How can I help you next?</p>
-                    </div>
-                </div>
-            `;
+            await fetch(`/api/chats/${encodeURIComponent(activeChatId)}/clear`, { method: "POST" });
+            await loadChatHistory(activeChatId);
         }
     });
+
+    if (newChatBtn) {
+        newChatBtn.addEventListener("click", async () => {
+            const resp = await fetch("/api/chats", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ title: "New Chat" }),
+            });
+            if (!resp.ok) return;
+            const data = await resp.json();
+            activeChatId = data.chat.chat_id;
+            localStorage.setItem("zenoActiveChatId", activeChatId);
+            await refreshChats();
+            await loadChatHistory(activeChatId);
+        });
+    }
 
     if (voiceToggleBtn) {
         voiceToggleBtn.addEventListener("click", () => {
@@ -256,6 +374,7 @@ document.addEventListener("DOMContentLoaded", () => {
                 body: JSON.stringify({
                     message: text,
                     synthesize_voice: voiceRepliesEnabled,
+                    chat_id: activeChatId,
                 })
             });
             if (!resp.ok) {
@@ -278,6 +397,7 @@ document.addEventListener("DOMContentLoaded", () => {
                     } else {
                         updateMessageText(assistantDraft, data.response || assistantText);
                     }
+                    refreshChats().catch(() => {});
                     if (shouldPlayVoiceReply(data)) {
                         audioPlayer.src = data.audio_url;
                         audioPlayer.play().catch(() => console.log("Audio autoplay prevented"));
@@ -390,6 +510,7 @@ document.addEventListener("DOMContentLoaded", () => {
         const formData = new FormData();
         formData.append("file", audioBlob, "voice_recording.webm");
         formData.append("synthesize_voice", String(voiceRepliesEnabled));
+        formData.append("chat_id", activeChatId);
 
         const loadingDiv = appendMessage("assistant", "🎙️ Transcribing and thinking...");
 
@@ -447,6 +568,7 @@ document.addEventListener("DOMContentLoaded", () => {
                     } else {
                         updateMessageText(assistantDraft, data.response || assistantText);
                     }
+                    refreshChats().catch(() => {});
                     if (shouldPlayVoiceReply(data)) {
                         audioPlayer.src = data.audio_url;
                         audioPlayer.play().catch(() => console.log("Audio autoplay prevented"));
@@ -462,4 +584,13 @@ document.addEventListener("DOMContentLoaded", () => {
             appendMessage("assistant", "⚠️ Error processing voice note.");
         }
     }
+
+    async function bootstrap() {
+        await refreshChats();
+        await loadChatHistory(activeChatId);
+    }
+
+    bootstrap().catch(() => {
+        renderChatList([]);
+    });
 });

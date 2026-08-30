@@ -118,7 +118,7 @@ async def handle_voice_message(update: Update, context: ContextTypes.DEFAULT_TYP
             tmp_path = Path(tmp_audio.name)
 
         try:
-            audio_path = tts_engine.synthesize_to_file(reply_text, tmp_path)
+            audio_path = await tts_engine.synthesize_to_file(reply_text, tmp_path)
             if audio_path and audio_path.exists():
                 await update.message.chat.send_action("upload_voice")
                 with open(audio_path, "rb") as voice_fh:
