@@ -32,12 +32,7 @@ services:
       - MICROSOFT_TENANT_ID=${MICROSOFT_TENANT_ID:-common}
     volumes:
       - zeno_vault:/data/vault
-    healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
-      interval: 30s
-      timeout: 10s
-      retries: 3
-      start_period: 20s
+
 
 volumes:
   zeno_vault:
