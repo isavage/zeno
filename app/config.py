@@ -75,7 +75,7 @@ class Settings(BaseSettings):
     MICROSOFT_REDIRECT_PATH: str = "/auth/microsoft/callback"
 
     # Voice Engine
-    WHISPER_MODEL_SIZE: str = "base.en"
+    WHISPER_MODEL_SIZE: str = "small.en"
     KOKORO_VOICE: str = "af_heart"
     # Primary TTS provider: "edge" uses free edge‑tts wrapper, "kokoro" forces Kokoro only
     TTS_PROVIDER: str = "edge"

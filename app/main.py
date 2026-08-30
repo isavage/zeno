@@ -1,3 +1,4 @@
+import json
 import os
 import uuid
 import logging
@@ -8,7 +9,7 @@ from typing import Optional, Dict, Any
 from typing import List, Optional, Dict, Any
 
 from fastapi import FastAPI, Request, Form, UploadFile, File, HTTPException, status, Depends, APIRouter
-from fastapi.responses import HTMLResponse, RedirectResponse, JSONResponse, FileResponse
+from fastapi.responses import HTMLResponse, RedirectResponse, JSONResponse, FileResponse, StreamingResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 from fastapi.middleware.trustedhost import TrustedHostMiddleware
@@ -110,6 +111,10 @@ def build_redirect_uri(request: Request, path: str) -> str:
     scheme = (forwarded_proto or request.url.scheme).split(",")[0].strip()
     normalized_path = path if path.startswith("/") else f"/{path}"
     return f"{scheme}://{host}{normalized_path}"
+
+
+def sse_frame(event: str, payload: Dict[str, Any]) -> str:
+    return f"event: {event}\ndata: {json.dumps(payload, ensure_ascii=False)}\n\n"
 
 @admin_router.get("")
 @admin_router.get("/")
@@ -287,22 +292,47 @@ async def chat_endpoint(request: Request):
         raise HTTPException(status_code=400, detail="Empty message")
 
     session_id = f"web_{user['email']}"
-    result = await zeno_agent.process_query(session_id, message)
+    synthesize_voice = bool(body.get("synthesize_voice", False))
 
-    # Optional speech synthesis for web client
-    audio_url = None
-    if body.get("synthesize_voice", False):
-        audio_id = f"{uuid.uuid4().hex}.wav"
-        audio_path = AUDIO_CACHE_DIR / audio_id
-        saved_path = tts_engine.synthesize_to_file(result.get("response", ""), audio_path)
-        if saved_path and saved_path.exists():
-            audio_url = f"/api/audio/{audio_id}"
+    async def event_stream():
+        final_result: Dict[str, Any] = {}
+        try:
+            async for event in zeno_agent.stream_query(session_id, message):
+                if event.get("type") == "delta":
+                    yield sse_frame("delta", event)
+                elif event.get("type") == "done":
+                    final_result = event
+                    audio_url = None
+                    if synthesize_voice:
+                        audio_path = AUDIO_CACHE_DIR / f"{uuid.uuid4().hex}{tts_engine.output_suffix}"
+                        try:
+                            saved_path = tts_engine.synthesize_to_file(final_result.get("response", ""), audio_path)
+                            if saved_path and saved_path.exists():
+                                audio_url = f"/api/audio/{saved_path.name}"
+                        except Exception as e:
+                            logger.warning(f"Voice synthesis error: {e}")
 
-    result["audio_url"] = audio_url
-    return JSONResponse(result)
+                    payload = dict(final_result)
+                    payload["audio_url"] = audio_url
+                    yield sse_frame("done", payload)
+                else:
+                    yield sse_frame(event.get("type", "message"), event)
+        except Exception as e:
+            logger.error(f"Chat streaming failed: {e}")
+            yield sse_frame("error", {"detail": "Chat streaming failed"})
+
+    return StreamingResponse(
+        event_stream(),
+        media_type="text/event-stream",
+        headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"},
+    )
 
 @app.post("/api/voice")
-async def voice_endpoint(request: Request, file: UploadFile = File(...)):
+async def voice_endpoint(
+    request: Request,
+    file: UploadFile = File(...),
+    synthesize_voice: bool = Form(True),
+):
     user = await get_current_user(request)
     session_id = f"web_{user['email']}"
 
@@ -319,38 +349,53 @@ async def voice_endpoint(request: Request, file: UploadFile = File(...)):
         raise HTTPException(status_code=500, detail="Speech-to-text failed")
 
     if not transcription:
-        return JSONResponse({
-            "transcription": "",
-            "response": "I couldn't hear any speech. Please try speaking again.",
-            "audio_url": None,
-            "status": "success"
-        })
+        async def no_speech_stream():
+            yield sse_frame("transcription", {"transcription": ""})
+            yield sse_frame("done", {
+                "transcription": "",
+                "response": "I couldn't hear any speech. Please try speaking again.",
+                "audio_url": None,
+                "status": "success",
+            })
 
-    # 2. Process query with Hermes Agent
-    result = await zeno_agent.process_query(session_id, transcription)
-    reply_text = result.get("response", "")
+        return StreamingResponse(
+            no_speech_stream(),
+            media_type="text/event-stream",
+            headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"},
+        )
 
-    # 3. Synthesize voice reply
-    audio_id = f"{uuid.uuid4().hex}.wav"
-    audio_path = AUDIO_CACHE_DIR / audio_id
-    audio_url = None
+    async def event_stream():
+        yield sse_frame("transcription", {"transcription": transcription})
+        try:
+            async for event in zeno_agent.stream_query(session_id, transcription):
+                if event.get("type") == "delta":
+                    yield sse_frame("delta", event)
+                elif event.get("type") == "done":
+                    audio_url = None
+                    if synthesize_voice:
+                        audio_path = AUDIO_CACHE_DIR / f"{uuid.uuid4().hex}{tts_engine.output_suffix}"
+                        try:
+                            saved_path = tts_engine.synthesize_to_file(event.get("response", ""), audio_path)
+                            if saved_path and saved_path.exists():
+                                audio_url = f"/api/audio/{saved_path.name}"
+                        except Exception as e:
+                            logger.warning(f"Voice synthesis error: {e}")
 
-    try:
-        saved_path = tts_engine.synthesize_to_file(reply_text, audio_path)
-        if saved_path and saved_path.exists():
-            audio_url = f"/api/audio/{audio_id}"
-    except Exception as e:
-        logger.warning(f"Voice synthesis error: {e}")
+                    payload = dict(event)
+                    payload["transcription"] = transcription
+                    payload["audio_url"] = audio_url
+                    yield sse_frame("done", payload)
+                else:
+                    yield sse_frame(event.get("type", "message"), event)
+        except Exception as e:
+            logger.error(f"Voice streaming failed: {e}")
+            yield sse_frame("error", {"detail": "Voice streaming failed"})
 
-    return JSONResponse({
-        "transcription": transcription,
-        "response": reply_text,
-        "model_used": result.get("model_used"),
-        "tools_called": result.get("tools_called"),
-        "complexity": result.get("complexity"),
-        "audio_url": audio_url,
-        "status": "success"
-    })
+    return StreamingResponse(
+        event_stream(),
+        media_type="text/event-stream",
+        headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"},
+    )
 
 @app.get("/api/audio/{filename}")
 async def get_audio_file(filename: str):
@@ -359,7 +404,8 @@ async def get_audio_file(filename: str):
     file_path = AUDIO_CACHE_DIR / safe_name
     if not file_path.exists():
         raise HTTPException(status_code=404, detail="Audio not found or expired")
-    return FileResponse(path=str(file_path), media_type="audio/wav")
+    media_type = "audio/mpeg" if file_path.suffix.lower() == ".mp3" else "audio/wav"
+    return FileResponse(path=str(file_path), media_type=media_type)
 
 @app.post("/api/clear")
 async def clear_session_endpoint(request: Request):

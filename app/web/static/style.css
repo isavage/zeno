@@ -227,6 +227,29 @@ body {
     color: #9fd0ff;
 }
 
+.voice-toggle {
+    gap: 8px;
+    cursor: pointer;
+}
+
+.voice-toggle-dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 999px;
+    background: var(--success);
+    box-shadow: 0 0 8px rgba(63, 185, 80, 0.8);
+}
+
+.voice-toggle.voice-off {
+    color: var(--text-secondary);
+    border-color: rgba(139, 148, 158, 0.35);
+}
+
+.voice-toggle.voice-off .voice-toggle-dot {
+    background: var(--danger);
+    box-shadow: 0 0 8px rgba(248, 81, 73, 0.8);
+}
+
 .icon-btn {
     background: transparent;
     border: 1px solid var(--border-color);
@@ -490,6 +513,21 @@ body {
     color: var(--accent);
     font-size: 13px;
     font-weight: 500;
+}
+
+.voice-status-copy {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    max-width: min(100%, 560px);
+}
+
+.voice-transcript {
+    color: #c7d2fe;
+    font-size: 13px;
+    line-height: 1.4;
+    font-style: italic;
+    word-break: break-word;
 }
 
 .pulse-wave {

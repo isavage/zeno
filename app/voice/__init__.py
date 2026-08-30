@@ -15,12 +15,21 @@ class TTSEngine:
 
     def __init__(self):
         provider = getattr(settings, "TTS_PROVIDER", "edge")
+        self.provider_name = provider
         if provider == "edge":
             self.primary = EdgeTTSEngine(voice=getattr(settings, "EDGE_TTS_VOICE", "en-US-AriaNeural"))
         else:
             self.primary = KokoroTTSEngine()
         # Fallback always uses Kokoro
         self.fallback = KokoroTTSEngine()
+
+    @property
+    def output_suffix(self) -> str:
+        return ".mp3" if self.provider_name == "edge" else ".wav"
+
+    @property
+    def media_type(self) -> str:
+        return "audio/mpeg" if self.provider_name == "edge" else "audio/wav"
 
     def _is_rate_limit_error(self, exc: Exception) -> bool:
         msg = str(exc).lower()
@@ -33,7 +42,8 @@ class TTSEngine:
             if self._is_rate_limit_error(e):
                 logger.warning(f"Edge TTS rate‑limit encountered ({e}); falling back to Kokoro.")
                 try:
-                    return self.fallback.synthesize_to_file(text, out_path)
+                    fallback_path = out_path.with_suffix(".wav")
+                    return self.fallback.synthesize_to_file(text, fallback_path)
                 except Exception as e2:
                     logger.error(f"Fallback TTS also failed: {e2}")
                     return None

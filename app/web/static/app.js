@@ -6,10 +6,103 @@ document.addEventListener("DOMContentLoaded", () => {
     const voiceStatus = document.getElementById("voiceStatus");
     const clearChatBtn = document.getElementById("clearChatBtn");
     const audioPlayer = document.getElementById("audioPlayer");
+    const voiceToggleBtn = document.getElementById("voiceToggleBtn");
+    const voiceToggleLabel = document.getElementById("voiceToggleLabel");
+    const voiceTranscript = document.getElementById("voiceTranscript");
 
     let mediaRecorder = null;
+    let mediaStream = null;
+    let audioContext = null;
+    let analyser = null;
+    let silenceMonitorId = null;
     let audioChunks = [];
     let isRecording = false;
+    let speechRecognition = null;
+    let recordingDraftMessage = null;
+    let voiceRepliesEnabled = localStorage.getItem("zenoVoiceReplies");
+    voiceRepliesEnabled = voiceRepliesEnabled === null ? true : voiceRepliesEnabled === "true";
+
+    const SILENCE_THRESHOLD = 0.02;
+    const SILENCE_DURATION_MS = 2000;
+    let lastVoiceActivityAt = 0;
+
+    function updateVoiceToggleUI() {
+        if (!voiceToggleBtn || !voiceToggleLabel) return;
+        voiceToggleBtn.classList.toggle("voice-off", !voiceRepliesEnabled);
+        voiceToggleBtn.classList.toggle("voice-on", voiceRepliesEnabled);
+        voiceToggleLabel.textContent = voiceRepliesEnabled ? "Voice On" : "Voice Off";
+        voiceToggleBtn.title = voiceRepliesEnabled ? "Voice replies are on" : "Voice replies are off";
+    }
+
+    function shouldPlayVoiceReply(data) {
+        return voiceRepliesEnabled && data && data.audio_url;
+    }
+
+    function updateLiveTranscript(text) {
+        if (!voiceTranscript) return;
+        const clean = (text || "").trim();
+        voiceTranscript.textContent = clean;
+        voiceTranscript.classList.toggle("hidden", !clean);
+    }
+
+    function stopSpeechRecognition() {
+        if (speechRecognition) {
+            try {
+                speechRecognition.onresult = null;
+                speechRecognition.onend = null;
+                speechRecognition.onerror = null;
+                speechRecognition.stop();
+            } catch (err) {
+                // Ignore stop errors if recognition has already ended.
+            }
+            speechRecognition = null;
+        }
+    }
+
+    function stopSilenceMonitor() {
+        if (silenceMonitorId) {
+            clearInterval(silenceMonitorId);
+            silenceMonitorId = null;
+        }
+        if (audioContext) {
+            audioContext.close().catch(() => {});
+            audioContext = null;
+            analyser = null;
+        }
+        mediaStream = null;
+    }
+
+    function startSilenceMonitor(stream) {
+        const AudioContext = window.AudioContext || window.webkitAudioContext;
+        if (!AudioContext) return;
+
+        audioContext = new AudioContext();
+        const source = audioContext.createMediaStreamSource(stream);
+        analyser = audioContext.createAnalyser();
+        analyser.fftSize = 2048;
+        source.connect(analyser);
+
+        const samples = new Uint8Array(analyser.fftSize);
+        lastVoiceActivityAt = Date.now();
+
+        silenceMonitorId = setInterval(() => {
+            if (!analyser || !isRecording) return;
+            analyser.getByteTimeDomainData(samples);
+            let sumSquares = 0;
+            for (let i = 0; i < samples.length; i += 1) {
+                const normalized = (samples[i] - 128) / 128;
+                sumSquares += normalized * normalized;
+            }
+            const rms = Math.sqrt(sumSquares / samples.length);
+            if (rms > SILENCE_THRESHOLD) {
+                lastVoiceActivityAt = Date.now();
+            } else if (Date.now() - lastVoiceActivityAt > SILENCE_DURATION_MS) {
+                stopRecording();
+            }
+        }, 100);
+    }
+
+    updateVoiceToggleUI();
 
     // Auto-resize textarea
     messageInput.addEventListener("input", () => {
@@ -39,6 +132,14 @@ document.addEventListener("DOMContentLoaded", () => {
         }
     });
 
+    if (voiceToggleBtn) {
+        voiceToggleBtn.addEventListener("click", () => {
+            voiceRepliesEnabled = !voiceRepliesEnabled;
+            localStorage.setItem("zenoVoiceReplies", String(voiceRepliesEnabled));
+            updateVoiceToggleUI();
+        });
+    }
+
     // Append Message to UI
     function appendMessage(role, text, meta = null) {
         const msgDiv = document.createElement("div");
@@ -48,6 +149,7 @@ document.addEventListener("DOMContentLoaded", () => {
         bubble.className = "message-bubble";
         bubble.innerHTML = marked.parse(text || "");
         msgDiv.appendChild(bubble);
+        msgDiv._bubble = bubble;
 
         if (meta && (meta.model_used || meta.tools_called?.length)) {
             const metaDiv = document.createElement("div");
@@ -66,6 +168,72 @@ document.addEventListener("DOMContentLoaded", () => {
         return msgDiv;
     }
 
+    function updateMessageText(messageEl, text) {
+        if (!messageEl || !messageEl._bubble) return;
+        messageEl._bubble.innerHTML = marked.parse(text || "");
+        chatMessages.scrollTop = chatMessages.scrollHeight;
+    }
+
+    function parseSSEBlock(block) {
+        let event = "message";
+        const dataLines = [];
+        for (const line of block.split("\n")) {
+            if (line.startsWith("event:")) {
+                event = line.slice(6).trim();
+            } else if (line.startsWith("data:")) {
+                dataLines.push(line.slice(5).trimStart());
+            }
+        }
+        const dataText = dataLines.join("\n");
+        let data = null;
+        if (dataText) {
+            try {
+                data = JSON.parse(dataText);
+            } catch (err) {
+                data = { text: dataText };
+            }
+        }
+        return { event, data };
+    }
+
+    async function consumeSSEResponse(resp, handlers) {
+        if (!resp.body) {
+            throw new Error("Streaming response body not available.");
+        }
+
+        const reader = resp.body.getReader();
+        const decoder = new TextDecoder();
+        let buffer = "";
+
+        while (true) {
+            const { value, done } = await reader.read();
+            if (done) break;
+            buffer += decoder.decode(value, { stream: true });
+
+            let boundaryIndex = buffer.indexOf("\n\n");
+            while (boundaryIndex !== -1) {
+                const block = buffer.slice(0, boundaryIndex).trim();
+                buffer = buffer.slice(boundaryIndex + 2);
+                if (block) {
+                    const { event, data } = parseSSEBlock(block);
+                    if (handlers[event]) {
+                        handlers[event](data || {});
+                    }
+                }
+                boundaryIndex = buffer.indexOf("\n\n");
+            }
+        }
+
+        buffer += decoder.decode();
+        const finalBlock = buffer.trim();
+        if (finalBlock) {
+            const { event, data } = parseSSEBlock(finalBlock);
+            if (handlers[event]) {
+                handlers[event](data || {});
+            }
+        }
+    }
+
     // Submit Text Message
     chatForm.addEventListener("submit", async (e) => {
         e.preventDefault();
@@ -77,22 +245,49 @@ document.addEventListener("DOMContentLoaded", () => {
         appendMessage("user", text);
 
         // Add loading placeholder
-        const loadingDiv = appendMessage("assistant", "Thinking...");
+        let loadingDiv = appendMessage("assistant", "Thinking...");
+        let assistantDraft = null;
+        let assistantText = "";
 
         try {
             const resp = await fetch("/api/chat", {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ message: text })
+                body: JSON.stringify({
+                    message: text,
+                    synthesize_voice: voiceRepliesEnabled,
+                })
             });
-            const data = await resp.json();
-            loadingDiv.remove();
-            appendMessage("assistant", data.response, data);
-
-            if (data.audio_url) {
-                audioPlayer.src = data.audio_url;
-                audioPlayer.play().catch(e => console.log("Audio autoplay prevented"));
+            if (!resp.ok) {
+                throw new Error("Chat request failed.");
             }
+
+            await consumeSSEResponse(resp, {
+                delta: (data) => {
+                    if (!assistantDraft) {
+                        loadingDiv.remove();
+                        assistantDraft = appendMessage("assistant", "");
+                    }
+                    assistantText += data.text || "";
+                    updateMessageText(assistantDraft, assistantText);
+                },
+                done: (data) => {
+                    if (!assistantDraft) {
+                        loadingDiv.remove();
+                        assistantDraft = appendMessage("assistant", data.response || "", data);
+                    } else {
+                        updateMessageText(assistantDraft, data.response || assistantText);
+                    }
+                    if (shouldPlayVoiceReply(data)) {
+                        audioPlayer.src = data.audio_url;
+                        audioPlayer.play().catch(() => console.log("Audio autoplay prevented"));
+                    }
+                },
+                error: () => {
+                    if (loadingDiv) loadingDiv.remove();
+                    appendMessage("assistant", "⚠️ Error communicating with Zeno.");
+                },
+            });
         } catch (err) {
             loadingDiv.remove();
             appendMessage("assistant", "⚠️ Error communicating with Zeno.");
@@ -110,9 +305,51 @@ document.addEventListener("DOMContentLoaded", () => {
 
     async function startRecording() {
         try {
-            const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-            mediaRecorder = new MediaRecorder(stream);
+            mediaStream = await navigator.mediaDevices.getUserMedia({ audio: true });
+            mediaRecorder = new MediaRecorder(mediaStream);
             audioChunks = [];
+            updateLiveTranscript("");
+            recordingDraftMessage = appendMessage("user", "🎙️ Listening...");
+
+            const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+            if (SpeechRecognition) {
+                speechRecognition = new SpeechRecognition();
+                speechRecognition.lang = "en-US";
+                speechRecognition.interimResults = true;
+                speechRecognition.continuous = true;
+
+                let finalTranscript = "";
+                speechRecognition.onresult = (event) => {
+                    let interimTranscript = "";
+                    for (let i = event.resultIndex; i < event.results.length; i += 1) {
+                        const transcript = event.results[i][0].transcript;
+                        if (event.results[i].isFinal) {
+                            finalTranscript += transcript;
+                        } else {
+                            interimTranscript += transcript;
+                        }
+                    }
+                    const transcriptText = (finalTranscript + " " + interimTranscript).trim();
+                    updateLiveTranscript(transcriptText);
+                    if (recordingDraftMessage) {
+                        updateMessageText(recordingDraftMessage, transcriptText ? `🎙️ *"${transcriptText}"*` : "🎙️ Listening...");
+                    }
+                };
+
+                speechRecognition.onerror = () => {
+                    stopSpeechRecognition();
+                };
+
+                speechRecognition.onend = () => {
+                    // Keep the last transcript visible until the recording is sent or canceled.
+                };
+
+                try {
+                    speechRecognition.start();
+                } catch (err) {
+                    // If the browser refuses to start recognition, keep audio recording only.
+                }
+            }
 
             mediaRecorder.ondataavailable = (event) => {
                 if (event.data.size > 0) {
@@ -122,7 +359,11 @@ document.addEventListener("DOMContentLoaded", () => {
 
             mediaRecorder.onstop = async () => {
                 const audioBlob = new Blob(audioChunks, { type: "audio/webm" });
-                stream.getTracks().forEach(track => track.stop());
+                if (mediaStream) {
+                    mediaStream.getTracks().forEach(track => track.stop());
+                }
+                stopSilenceMonitor();
+                stopSpeechRecognition();
                 await sendVoiceNote(audioBlob);
             };
 
@@ -130,6 +371,7 @@ document.addEventListener("DOMContentLoaded", () => {
             isRecording = true;
             micBtn.classList.add("recording");
             voiceStatus.classList.remove("hidden");
+            startSilenceMonitor(mediaStream);
         } catch (err) {
             alert("Microphone access is required for voice mode.");
         }
@@ -147,6 +389,7 @@ document.addEventListener("DOMContentLoaded", () => {
     async function sendVoiceNote(audioBlob) {
         const formData = new FormData();
         formData.append("file", audioBlob, "voice_recording.webm");
+        formData.append("synthesize_voice", String(voiceRepliesEnabled));
 
         const loadingDiv = appendMessage("assistant", "🎙️ Transcribing and thinking...");
 
@@ -155,18 +398,65 @@ document.addEventListener("DOMContentLoaded", () => {
                 method: "POST",
                 body: formData
             });
-            const data = await resp.json();
-            loadingDiv.remove();
-
-            if (data.transcription) {
-                appendMessage("user", `🎙️ *"${data.transcription}"*`);
+            if (!resp.ok) {
+                throw new Error("Voice request failed.");
             }
-            appendMessage("assistant", data.response, data);
 
-            if (data.audio_url) {
-                audioPlayer.src = data.audio_url;
-                audioPlayer.play().catch(e => console.log("Audio autoplay prevented"));
-            }
+            let userTranscriptAppended = false;
+            let assistantDraft = null;
+            let assistantText = "";
+
+            await consumeSSEResponse(resp, {
+                transcription: (data) => {
+                    updateLiveTranscript(data.transcription || "");
+                    if (data.transcription && !userTranscriptAppended) {
+                        if (recordingDraftMessage) {
+                            updateMessageText(recordingDraftMessage, `🎙️ *"${data.transcription}"*`);
+                            recordingDraftMessage = null;
+                        } else {
+                            appendMessage("user", `🎙️ *"${data.transcription}"*`);
+                        }
+                        userTranscriptAppended = true;
+                    }
+                },
+                delta: (data) => {
+                    if (!assistantDraft) {
+                        loadingDiv.remove();
+                        assistantDraft = appendMessage("assistant", "");
+                    }
+                    assistantText += data.text || "";
+                    updateMessageText(assistantDraft, assistantText);
+                },
+                done: (data) => {
+                    if (!data.transcription && recordingDraftMessage) {
+                        updateMessageText(recordingDraftMessage, "🎙️ _No speech detected._");
+                        recordingDraftMessage = null;
+                    }
+                    if (!userTranscriptAppended && data.transcription) {
+                        if (recordingDraftMessage) {
+                            updateMessageText(recordingDraftMessage, `🎙️ *"${data.transcription}"*`);
+                            recordingDraftMessage = null;
+                        } else {
+                            appendMessage("user", `🎙️ *"${data.transcription}"*`);
+                        }
+                    }
+                    updateLiveTranscript(data.transcription || "");
+                    if (!assistantDraft) {
+                        loadingDiv.remove();
+                        assistantDraft = appendMessage("assistant", data.response || "", data);
+                    } else {
+                        updateMessageText(assistantDraft, data.response || assistantText);
+                    }
+                    if (shouldPlayVoiceReply(data)) {
+                        audioPlayer.src = data.audio_url;
+                        audioPlayer.play().catch(() => console.log("Audio autoplay prevented"));
+                    }
+                },
+                error: () => {
+                    loadingDiv.remove();
+                    appendMessage("assistant", "⚠️ Error processing voice note.");
+                },
+            });
         } catch (err) {
             loadingDiv.remove();
             appendMessage("assistant", "⚠️ Error processing voice note.");
