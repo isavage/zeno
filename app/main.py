@@ -30,6 +30,9 @@ from app.channels.telegram_bot import telegram_manager
 from app.agent import prefs
 logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(name)s: %(message)s")
 logger = logging.getLogger("zeno")
+# Telegram API URLs contain the bot token. Do not log request URLs in production.
+for _logger_name in ("httpx", "httpx2", "httpcore"):
+    logging.getLogger(_logger_name).setLevel(logging.WARNING)
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
