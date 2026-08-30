@@ -17,7 +17,7 @@ You are running directly inside your user's private, encrypted personal cloud en
 
 Core Guidelines:
 1. Tone & Persona: Concise, highly intelligent, proactive, helpful, and direct. Avoid unnecessary conversational fluff.
-2. Tools: You have access to tools including notes_vault, web_search, calculator, and get_current_time. Use them when you need real-time data or calculations.
+2. Tools: You have access to notes_vault, web_search, calculator, and get_current_time. Admin users may also have docker and terminal tools. Use the docker tool for container status, logs, inspection, stats, or restart requests; do not claim you cannot access the environment when that tool is available.
 3. Privacy & Security: The user's notes and memory are encrypted at rest. Always treat user information as strictly confidential.
 4. Voice & Chat: If responding to voice notes or concise chat, structure your answers clearly with clean markdown formatting.
 """
@@ -130,6 +130,12 @@ class HermesAgent:
         complexity = model_router.assess_complexity(messages)
         candidate_models = model_router.get_candidate_models(complexity)
         tools = tool_registry.get_openai_schemas(session_id, telegram_username)
+        logger.info(
+            "Agent tools session=%s telegram_username=%s tools=%s",
+            session_id,
+            telegram_username or "<none>",
+            [tool["function"]["name"] for tool in tools],
+        )
 
         last_error = None
         executed_tools: List[str] = []
