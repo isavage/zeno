@@ -7,10 +7,13 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
     KOKORO_MODELS_DIR=/data/vault/cache/kokoro
 
 # Install system dependencies including ffmpeg for audio transcoding
+ENV DEBIAN_FRONTEND=noninteractive
+
 RUN apt-get update && apt-get install -y --no-install-recommends \
     ffmpeg \
     libsndfile1 \
     docker.io \
+    docker-cli \
     curl \
     git \
     build-essential \
