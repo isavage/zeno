@@ -67,7 +67,7 @@ class ToolRegistry:
         tool = self.get_tool(name)
         if not tool:
             return {"error": f"Tool '{name}' not found."}
-        if name == "docker" and not self._docker_allowed_for_session(session_id):
+        if name == "docker" and not self._admin_tool_allowed_for_session(session_id, telegram_username):
             return {"error": "Docker control is restricted to admin users."}
         if name == "terminal" and not self._admin_tool_allowed_for_session(session_id, telegram_username):
             return {"error": "Terminal access is restricted to admin users."}
