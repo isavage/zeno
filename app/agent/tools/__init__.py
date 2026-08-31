@@ -7,6 +7,7 @@ from app.agent.tools.web_search import WebSearchTool
 from app.agent.tools.notes_vault import NotesVaultTool
 from app.agent.tools.docker_tool import DockerTool
 from app.agent.tools.terminal_tool import TerminalTool
+from app.agent.tools.usage_report import UsageReportTool
 
 class ToolRegistry:
     """Registry managing available tools for the Hermes agent."""
@@ -20,6 +21,7 @@ class ToolRegistry:
         self.register(CurrentTimeTool())
         self.register(WebSearchTool())
         self.register(NotesVaultTool())
+        self.register(UsageReportTool())
         if settings.ENABLE_DOCKER_TOOL:
             self.register(DockerTool())
         if settings.ENABLE_TERMINAL_TOOL:
@@ -53,7 +55,7 @@ class ToolRegistry:
         return [
             tool.to_openai_tool()
             for tool in self._tools.values()
-            if tool.name not in {"docker", "terminal"}
+            if tool.name not in {"docker", "terminal", "usage_report"}
             or self._admin_tool_allowed_for_session(session_id, telegram_username)
         ]
 
@@ -71,6 +73,8 @@ class ToolRegistry:
             return {"error": "Docker control is restricted to admin users."}
         if name == "terminal" and not self._admin_tool_allowed_for_session(session_id, telegram_username):
             return {"error": "Terminal access is restricted to admin users."}
+        if name == "usage_report" and not self._admin_tool_allowed_for_session(session_id, telegram_username):
+            return {"error": "Usage reports are restricted to admin users."}
         return await tool.execute(**arguments)
 
 tool_registry = ToolRegistry()
