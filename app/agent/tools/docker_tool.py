@@ -1,5 +1,6 @@
 import asyncio
 import logging
+import shlex
 import subprocess
 from typing import Any, Dict
 
@@ -13,14 +14,15 @@ class DockerTool(BaseTool):
     name = "docker"
     description = (
         "Inspect configured Docker containers and restart them when explicitly requested. "
-        "Build, exec, rm, stop, and arbitrary shell commands are not available."
+        "Build, stop, rm, and arbitrary shell commands are not available. Read-only exec "
+        "commands may be used to inspect files or processes inside a configured container."
     )
     parameters = {
         "type": "object",
         "properties": {
             "action": {
                 "type": "string",
-                "enum": ["ps", "logs", "inspect", "stats", "restart"],
+                "enum": ["ps", "logs", "inspect", "stats", "exec", "restart"],
                 "description": "Docker operation to perform.",
             },
             "container": {
@@ -34,15 +36,26 @@ class DockerTool(BaseTool):
                 "default": 50,
                 "description": "Maximum log lines to return for logs.",
             },
+            "command": {
+                "type": "string",
+                "description": "Read-only command for exec, such as 'tail -n 100 /app/app.log'.",
+            },
         },
         "required": ["action"],
     }
 
-    async def execute(self, action: str, container: str = "", tail: int = 50, **kwargs) -> Any:
+    async def execute(
+        self,
+        action: str,
+        container: str = "",
+        tail: int = 50,
+        command: str = "",
+        **kwargs,
+    ) -> Any:
         if not settings.ENABLE_DOCKER_TOOL:
             return {"error": "Docker control is disabled."}
 
-        if action not in {"ps", "logs", "inspect", "stats", "restart"}:
+        if action not in {"ps", "logs", "inspect", "stats", "exec", "restart"}:
             return {"error": f"Unsupported Docker action: {action}"}
 
         if action == "ps":
@@ -60,6 +73,17 @@ class DockerTool(BaseTool):
                 command = ["docker", "inspect", target]
             elif action == "stats":
                 command = ["docker", "stats", "--no-stream", target]
+            elif action == "exec":
+                try:
+                    exec_args = shlex.split(command)
+                except ValueError:
+                    return {"error": "Invalid exec command syntax."}
+                if not exec_args or len(exec_args) > 20:
+                    return {"error": "A short read-only exec command is required."}
+                allowed_commands = {"cat", "head", "tail", "grep", "sed", "ls", "find", "du", "ps"}
+                if exec_args[0] not in allowed_commands:
+                    return {"error": "Only read-only inspection commands are allowed for docker exec."}
+                command = ["docker", "exec", target, *exec_args]
             else:
                 command = ["docker", "restart", target]
 
